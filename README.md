@@ -1,6 +1,6 @@
 # ConnectorAgents
 
-This is an extension to the Atomic agents framework and and example Application for news fetching.
+This is an extension to the Atomic agents [Atomic Agents GitHub](https://github.com/BrainBlend-AI/atomic-agents) framework and and example Application for news fetching.
 
 ## News Processing Agent Example
 
