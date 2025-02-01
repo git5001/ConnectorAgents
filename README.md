@@ -22,6 +22,53 @@ Prerequisites
 - Python 3.8+
 - pip (Python package manager)
 
+### Execution and Test
+
+The example application is located at
+```
+    ConnectorAgents/AgentNews/test/test_connected_agents.py
+```
+It uses the agent framework to set up agents to perform above newsletter generation.
+
+Note: This is not production code but a test example!
+
+
+Rough setup:
+```python
+  # Create agents
+  tavilyConfig = TavilySearchToolConfig(api_key=TAVILY_API_KEY, max_results=AMOUNT, topic='news', days=DAYS)
+  tavilyAgent = TavilyAgent(config=tavilyConfig)
+  ...
+  
+  # Message transformer
+  def transform_tavily_to_webscraper(output_msg: TavilySearchToolOutputSchema) -> List[WebpageScraperToolInputSchema]:
+    # Creates N Scrapers!
+    return [
+           WebpageScraperToolInputSchema(url=result.url, include_links=False)
+           for result in output_msg.results
+           ]
+    ...
+  
+  # Interconnect agents
+  tavilyAgent.output_port.connect(webScraper.input_port, transform_tavily_to_webscraper)
+  ...
+
+  
+  # Schedule agents
+  scheduler:AgentScheduler = AgentScheduler()
+  scheduler.add_agent(tavilyAgent)
+  ...
+
+  # Start chain
+  tavilyAgent.feed(TavilySearchToolInputSchema(queries=[TOPIC]))
+  
+  # Run
+   while scheduler.step():
+       pass
+
+
+```
+
 
 ### Contributing
 
