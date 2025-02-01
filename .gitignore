@@ -3,3 +3,9 @@
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/modules.xml
 /.idea/vcs.xml
+/AgentNews/test/.env
+/AgentFramework/__pycache__/*.pyc
+/.idea/misc.xml
+/AgentNews/__pycache__/*.pyc
+/AtomicTools/tavily_search/tool/__pycache__/*.pyc
+/AtomicTools/webpage_scraper/tool/__pycache__/*.pyc
