@@ -1,20 +1,31 @@
 # ConnectorAgents
 
-This is an extension to the Atomic agents [Atomic Agents GitHub](https://github.com/BrainBlend-AI/atomic-agents) framework and and example Application for news fetching.
-
-## News Processing Agent Example
+This is an extension to the Atomic agents [Atomic Agents GitHub](https://github.com/BrainBlend-AI/atomic-agents) framework.
 
 ### Overview
 
-This project is an extension of an agent-based framework for automated news processing using LLM agents, web scraping, and search tools. The system allows agents to:
+This project is an extension of an agent-based framework which includes agent connection, connection visualization and a scheduler.
 
-- Search internet news
-- Fetch news articles from various sources
+### Examples
+#### Automated News Processing 
+Automated news processing using LLM agents, web scraping, and search tools. The system allows agents to:
+
+- Search internet news and fetch webpages
 - Process and summarize content using LLMs
-- Structure output in multiple formats
-- Email results
-- Log messages for debugging and audit purposes.
+- Structure output in multiple formats, like Email or text
 
+#### Condition Logic 
+Shows just conditional port connections
+- Create simple counter
+- Conditional port allows only some numbers to pass
+
+
+#### Bookmark Organizer
+Use LLM to get your bookmarks organzied
+
+- Check if bookmarks are still online 
+- Use webscrping to get information about the page
+- Use LLM to make a new bookmark folder
 
 ### Installation
 
@@ -24,11 +35,11 @@ Prerequisites
 
 ### Execution and Test
 
-The example application is located at
+Example applications are located at
 ```
-    ConnectorAgents/AgentNews/test/test_connected_agents.py
+    ConnectorAgents/AgentNews/test/test_*.py
+    ConnectorAgents/AgentBookmarks/test/test_*.py
 ```
-It uses the agent framework to set up agents to perform above newsletter generation.
 
 Note: This is not production code but a test example!
 
@@ -53,7 +64,7 @@ def transform_tavily_to_webscraper(output_msg: TavilySearchToolOutputSchema) -> 
 
 
 # Interconnect agents
-tavilyAgent.output_port.connectTo(webScraper.input_port, transform_tavily_to_webscraper)
+tavilyAgent.connectTo(webScraper, transformer=transform_tavily_to_webscraper)
 ...
 
 # Schedule agents
@@ -65,9 +76,7 @@ scheduler.add_agent(tavilyAgent)
 tavilyAgent.feed(TavilySearchToolInputSchema(queries=[TOPIC]))
 
 # Run
-while scheduler.step():
-    pass
-
+scheduler.step_all()
 
 ```
 
