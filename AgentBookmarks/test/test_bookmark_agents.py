@@ -52,8 +52,8 @@ def main():
     LLM_LOG_DIR = f"{BASE_DIR}/log"
 
     #RESTORE_DIR = "T:/tmp/agents/scheduler_save/step_59"
-    RESTORE_DIR = "T:/tmp/agents/scheduler_save/step_2660"
-    #RESTORE_DIR = None
+    #RESTORE_DIR = "T:/tmp/agents/scheduler_save/step_2660"
+    RESTORE_DIR = None
 
     USE_LARGE_MODELS = True
 
@@ -74,8 +74,6 @@ def main():
     OPENAI_MODEL_FINAL = "gpt-4o-mini"
 
 
-    SHORT_LOOP_CNT =   30 # None #4 # Abort loops after n+1 items
-    SHORT_LOOP_CNT =     150  # None #4 # Abort loops after n+1 items # 127 fail 126 ok
     SHORT_LOOP_CNT = None  # -> 3510
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -91,6 +89,7 @@ def main():
     load_dotenv()
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+	# Local ollama
     BASE_URL = "http://192.168.2.78:11434/v1"
 
     SKIP_FIREFOX_BOOKMARKS = True
