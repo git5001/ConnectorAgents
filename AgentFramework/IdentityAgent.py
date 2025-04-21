@@ -10,8 +10,6 @@ from atomic_agents.lib.base.base_tool import BaseToolConfig
 from AgentFramework.ConnectedAgent import ConnectedAgent
 from AgentFramework.NullSchema import NullSchema
 
-rich_console = Console()
-
 
 class IdentityAgentConfig(BaseToolConfig):
     """
@@ -48,7 +46,6 @@ class IdentityAgent(ConnectedAgent):
             BaseModel: The output containing the message.
         """
 
-        print("xxxxx indentiy runnign xxx")
         return params
 
 

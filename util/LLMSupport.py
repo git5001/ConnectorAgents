@@ -1,29 +1,39 @@
+import glob
 import os
 from enum import Enum
 from typing import Optional, List, Dict, Any, Type, Tuple, Callable
 
 import json5
 from atomic_agents.lib.base.base_tool import BaseToolConfig
-from openai import OpenAI, NOT_GIVEN, NotGiven
+from openai import OpenAI, NOT_GIVEN, NotGiven, api_key
 import logging
 
 from openai.types import CompletionUsage
 from pydantic import BaseModel, Field
-from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type, before_sleep_log, RetryCallState
+from tenacity import retry, wait_exponential, stop_after_attempt, before_log, retry_if_exception_type, before_sleep_log, RetryCallState
 
+from agent_logging import logger
+from util.DoNotRetryException import DoNotRetryException
 from util.SchemaUtils import SchemaUtils
 from util.SchemaUtils import generate_template_json, clean_json_string
 
-
+log_cb = before_log(logger, logging.INFO)
 # Get a named logger (inherits root config if no specific config)
-logger = logging.getLogger(__name__)
-
 
 NANO_GPT_BASE_URL = "https://nano-gpt.com/api/v1"
 OPEN_ROUTER_BASE_URL="https://openrouter.ai/api/v1"
 
+def _before_sleep_combined(retry_state):
+    # first do the standard tenacity log
+    log_cb(retry_state)
+    # then sync the instance counter
+    inst = retry_state.args[0]  # your `self`
+    inst.retry_count = retry_state.attempt_number - 1
+    print(f"[sync: failed attempts so far = {inst.retry_count}]")
+
 class Provider(Enum):
     OPENAI = "OPENAI"
+    OPENAI_THINKING = "OPENAI_THINKING"
     NANOGPT = "NANOGPT"
     OLLAMA = "OLLAMA"
     OPENROUTER = "OPENROUTER"
@@ -46,12 +56,11 @@ class LLMAgentConfig(BaseToolConfig):
     use_response: Optional[bool] = Field(None, description="Utilize repsonse format if avaialble")
 
 
-
-
 class LLMModel:
     def __init__(
         self,
-        config:LLMAgentConfig
+        config:LLMAgentConfig,
+        parent_name:Optional[str]=None,
     ):
         """
         Initialize the LLMModel.
@@ -62,6 +71,11 @@ class LLMModel:
             api_key (Optional[str], optional): The API key to use. Defaults to None.
         """
         self.config = config
+        self.parent_name = parent_name
+        self.retry_count = 0
+
+        api_key = config.api_key
+        self._thinking = False
 
         if config.provider == Provider.NANOGPT:
             self.base_url = NANO_GPT_BASE_URL
@@ -73,6 +87,12 @@ class LLMModel:
             self._maxToken = 65536    # Deepseek 64K, Max 8K output
             self._hasSysPrompt = False
             self._hasResponseFormat = False
+        elif config.provider == Provider.OPENAI_THINKING:
+            self.base_url = None
+            self._maxToken = NOT_GIVEN
+            self._hasSysPrompt = True
+            self._hasResponseFormat = True
+            self._thinking = True
         elif config.provider == Provider.OPENAI:
             self.base_url = None
             self._maxToken = NOT_GIVEN
@@ -101,7 +121,7 @@ class LLMModel:
 
         self.log_dir = config.log_dir
         if not api_key:
-            api_key = ""
+            raise Exception("No API key provided. Provide at least empty string.")
 
         self.client =  OpenAI(api_key=api_key, base_url=self.base_url)
         self._model = config.model
@@ -118,6 +138,27 @@ class LLMModel:
 
     def hasSysPrompt(self):
         return self._hasSysPrompt
+
+    def create_text_completions(self, sysprompt, user_prompt, temperature: Optional[float] = None) -> Any:
+        # Prepare messages for the OpenAI API
+        if self.hasSysPrompt():
+            #logger.info(f"System prompt supported for model {self.name()}")
+            messages = [{"role": "system", "content": sysprompt}] if sysprompt else []
+            messages.append({"role": "user", "content": user_prompt})
+        else:
+            #logger.warning(f"Merging system prompt in prompt for
+            #
+            # model {self.name()}")
+            messages = [{"role": "user", "content": f"{sysprompt}\n{user_prompt}"}]
+            #logger.debug(f"Prompt is: {sysprompt}\n{user_prompt}")
+
+        response = self.create_completions(messages, temperature)
+        # Extract the updated emotional states from the response
+        usage = response.usage
+        llm_text = response.choices[0].message.content
+        logger.info(f"... external LLM data received: {len(llm_text)} characters")
+        logger.info(f"LLM Usage {usage}")
+        return llm_text, usage
 
     def create_completions(
         self,
@@ -140,10 +181,17 @@ class LLMModel:
             temperature = NOT_GIVEN
 
         logger.info(f"Calling model {self.model()} chat completions token={self._maxToken} temperature={temperature}")
+        maxToken = self._maxToken
+        maxCompletionToken = NOT_GIVEN
+        if self._thinking:
+            maxCompletionToken = self._maxToken
+            maxToken =  NOT_GIVEN
+
         response = self.client.chat.completions.create(model=self._model,
                                                        messages=messages,
                                                        temperature=temperature,
-                                                       max_tokens=self._maxToken,
+                                                       max_tokens=maxToken,
+                                                       max_completion_tokens=maxCompletionToken
                                                        )
         #logger.debug("LLM: Resopnse " ,response)
 
@@ -196,17 +244,22 @@ class LLMModel:
             temperature = NOT_GIVEN
 
 
-        logger.info(f"Calling model {self.model()} json strict token={self._maxToken} temperature={temperature}")
+
+
+        logger.info(f"Calling model {self.model()} json strict token={self._maxToken} temperature={temperature} timeout={timeout}")
+        maxToken = self._maxToken
+        maxCompletionToken = NOT_GIVEN
+        if self._thinking:
+            maxCompletionToken = self._maxToken
+            maxToken =  NOT_GIVEN
         response = self.client.chat.completions.create(model=self._model,
                                                        messages=messages,
                                                        response_format=response_format,
                                                        temperature=temperature,
-                                                       max_tokens=self._maxToken,
+                                                       max_tokens=maxToken,
+                                                       max_completion_tokens=maxCompletionToken,
                                                        timeout=timeout
                                                        )
-        #print("rrrr",response)
-        logger.info("Done LLM call")
-
         # Extract the updated emotional states from the response
         usage = response.usage
         llm_text = response.choices[0].message.content
@@ -216,11 +269,13 @@ class LLMModel:
 
         return response
 
+
+
     @retry(
-        wait=wait_exponential(multiplier=1, min=1, max=3),  # Exponential backoff with 1–3 seconds delay
-        stop=stop_after_attempt(5),  # Maximum of attempts
+        wait=wait_exponential(multiplier=1, min=1, max=30),  # Exponential backoff with 1–3 seconds delay
+        stop=stop_after_attempt(7),  # Maximum of attempts
         retry=retry_if_exception_type((Exception, ValueError)),  # Retry on specific exceptions
-        before_sleep=before_sleep_log(logger, logging.INFO)  # Log attempt details before each retry
+        before_sleep=_before_sleep_combined  # Log attempt details before each retry
     )
     def execute_llm_schema(self,sys_prompt:str,
                            user_prompt:str,
@@ -229,39 +284,42 @@ class LLMModel:
                            fix_function: Optional[Callable[[str], str]] = None,
                      retry_state: Optional[RetryCallState] = None) -> Tuple[BaseModel, CompletionUsage]:
 
-        # Get attempt number from retry state
-        attempt = retry_state.attempt_number if retry_state else 1
+        # Get attempt number from retry state <- TODO: Doe snot work like this
+        attempt = self.retry_count
+
+        temperature = min(0.5, max(0.0, 0.0 + (attempt - 1) * 0.1))
 
         schema_dict = LLMModel.openai_schema(targetType)
 
         # Prepare messages for the OpenAI API
         sysprompt = sys_prompt
         if self.hasSysPrompt():
-            logger.warning(f"System prompt supported for model {self.name()}")
+            #logger.warning(f"System prompt supported for model {self.name()}")
             messages = [{"role": "system", "content": sysprompt}] if sysprompt else []
             messages.append({"role": "user", "content": user_prompt})
         else:
-            logger.warning(f"Merging system prompt in prompt for model {self.name()}")
+            #logger.warning(f"Merging system prompt in prompt for model {self.name()}")
             messages = [{"role": "user", "content": f"{sysprompt}\n{user_prompt}"}]
-            logger.debug(f"Prompt is: {sysprompt}\n{user_prompt}")
-
+            #logger.debug(f"Prompt is: {sysprompt}\n{user_prompt}")
+        if attempt > 2:
+            messages.append("Your output must be a completely valid JSON, no additional text before or after the JSON output. All fields of the templte must be filled.")
         try:
-            logger.info(f"### Attempt {attempt}: Calling external LLM for {title}")
-            response = self.create_json_completions(messages, targetType.__class__.__name__, schema_dict, 0.0, timeout=self.config.timeout)
+            logger.info(f"### Attempt #{attempt}: Calling external LLM {self.name()} for {title}")
+            response = self.create_json_completions(messages, targetType.__name__, schema_dict, temperature, timeout=self.config.timeout)
             usage = response.usage
             llm_text = response.choices[0].message.content
             llm_text = clean_json_string(llm_text)
             if fix_function:
                 llm_text = fix_function(llm_text)
-            self.write_llm_log("llm.out",llm_text)
+            self.write_llm_log("llm_out",llm_text)
             try:
                 analysis_dict = json5.loads(llm_text)
-                # print("Analysis ", analysis_dict)
                 result_object = targetType(**analysis_dict)
-                print("-> xxResult pydantic", result_object)
             except  Exception as e:
-                print("-> Result for error was",llm_text)
-                self.write_llm_log("llm.err", llm_text)
+                logger.error(f"-> ERROR: Result for LLM {self.name()}  was",llm_text)
+                self.write_llm_log("llm_prompt", sysprompt or "")
+                self.write_llm_log("llm_prompt", user_prompt or "")
+                self.write_llm_log("llm_err", llm_text)
                 logger.error(f"Json or Pydantic error {e}")
                 llm_schema = generate_template_json(schema_dict)
                 prompt = f"""
@@ -285,14 +343,13 @@ class LLMModel:
                 llm_text = clean_json_string(llm_text)
                 if fix_function:
                     llm_text = fix_function(llm_text)
-                self.write_llm_log("llm.out", llm_text)
+                self.write_llm_log('output', llm_text)
                 try:
                     analysis_dict = json5.loads(llm_text)
                     result_object = targetType(**analysis_dict)
-                    print("-> yyResult pydantic", result_object)
                 except  Exception as e:
-                    print("-> Result for error with correction was", llm_text)
-                    self.write_llm_log("llm.err", llm_text)
+                    logger.error("-> Result for error with correction was", llm_text)
+                    self.write_llm_log('error', llm_text)
                     logger.error(f"Json or Pydantic error again {e}")
                     raise
         except Exception as e:
@@ -303,13 +360,25 @@ class LLMModel:
         return result_object, usage
 
 
+    def _logname(self, log_dir:str, typeid:str) -> str:
+        log_path = os.path.join(log_dir, f"llm_{self.parent_name}_{typeid}.log")
+        return log_path
 
-    def write_llm_log(self, filename:str, llm_text: str):
+
+    def write_llm_log(self, typeid:str, llm_text: str):
         if not self.log_dir:
             return
+        if not llm_text:
+            return
         os.makedirs(self.log_dir, exist_ok=True)  # Ensure the log directory exists
-        log_path = os.path.join(self.log_dir, filename)
-        with open(log_path, "a", encoding="utf-8") as f:  # "a" mode appends to the file
+        filename = self._logname(self.log_dir, typeid)
+        with open(filename, "a", encoding="utf-8") as f:  # "a" mode appends to the file
             f.write(llm_text + "\n")
 
+    def delete_log_files(self):
+        if not self.log_dir or not os.path.exists(self.log_dir):
+            return
+        pattern = os.path.join(self.log_dir, f"llm_{self.parent_name}_*.log")
+        for file in glob.glob(pattern):
+            os.remove(file)
 

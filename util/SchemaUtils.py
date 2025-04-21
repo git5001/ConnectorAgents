@@ -1,6 +1,8 @@
 import re
 import logging
-logger = logging.getLogger(__name__)
+
+from agent_logging import logger
+
 
 class SchemaUtils:
     @staticmethod
@@ -9,8 +11,8 @@ class SchemaUtils:
         Recursively ensure all objects in the schema have 'additionalProperties': false.
         """
         if "type" in schema and schema["type"] == "object":
-            # Add 'additionalProperties': false if not already set
-            schema.setdefault("additionalProperties", False)
+            # Force 'additionalProperties' to false, even if already present
+            schema["additionalProperties"] = False  # <-- fixed
 
             # Recurse into properties
             if "properties" in schema:
@@ -27,7 +29,6 @@ class SchemaUtils:
                 SchemaUtils.enforce_additional_properties_false(value)
 
         return schema
-
 
     @staticmethod
     def inline_all_references(schema: dict) -> dict:

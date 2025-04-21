@@ -5,8 +5,8 @@ from rich.console import Console
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 
 from AgentFramework.ConnectedAgent import ConnectedAgent
+from agent_logging import rich_console
 
-rich_console = Console()
 
 class PrintAgentConfig(BaseToolConfig):
     """

@@ -9,4 +9,7 @@
 /AgentNews/__pycache__/*.pyc
 /AtomicTools/tavily_search/tool/__pycache__/*.pyc
 /AtomicTools/webpage_scraper/tool/__pycache__/*.pyc
-/AgentNews/test/*.env
+/AgentBookmarks/test/.env
+*.pyc
+**/*.pyc
+

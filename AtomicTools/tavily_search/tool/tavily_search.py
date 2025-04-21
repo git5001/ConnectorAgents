@@ -9,6 +9,8 @@ from pydantic import Field
 from atomic_agents.agents.base_agent import BaseIOSchema
 from atomic_agents.lib.base.base_tool import BaseTool, BaseToolConfig
 
+from agent_logging import rich_console
+
 
 ################
 # INPUT SCHEMA #
@@ -202,8 +204,6 @@ class TavilySearchTool(BaseTool):
 #################
 if __name__ == "__main__":
     from rich.console import Console
-
-    rich_console = Console()
 
     search_tool_instance = TavilySearchTool(config=TavilySearchToolConfig(api_key=os.getenv("TAVILY_API_KEY"), max_results=2))
 

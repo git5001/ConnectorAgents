@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 from urllib.parse import urlparse
 import re
 
@@ -11,6 +11,8 @@ from readability import Document
 from atomic_agents.agents.base_agent import BaseIOSchema
 from atomic_agents.lib.base.base_tool import BaseTool, BaseToolConfig
 
+from AtomicTools.browser_handling.BrowserManager import get_browser_manager
+
 
 ################
 # INPUT SCHEMA #
@@ -20,7 +22,7 @@ class WebpageScraperToolInputSchema(BaseIOSchema):
     Input schema for the WebpageScraperTool.
     """
 
-    url: HttpUrl = Field(
+    url: Union[HttpUrl, None] = Field(
         ...,
         description="URL of the webpage to scrape.",
     )
@@ -103,34 +105,18 @@ class WebpageScraperTool(BaseTool):
 
     def _fetch_webpage(self, url: str) -> str:
         """
-        Fetches the webpage content with custom headers.
-
-        Args:
-            url (str): The URL to fetch.
-
-        Returns:
-            str: The HTML content of the webpage.
+        Fetches fully rendered HTML using Playwright.
         """
-        headers = {
-            "User-Agent": self.config.user_agent,  # Ensure this is a valid User-Agent string
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Connection": "keep-alive",
-            "Referer": "https://www.google.com",  # Some sites check referer
-            "Upgrade-Insecure-Requests": "1",
-        }
-
-        response = requests.get(url, headers=headers, timeout=self.config.timeout)
-        response.raise_for_status()
-
-        text = response.text
-        if len(response.text) > self.config.max_content_length:
+        manager = get_browser_manager()
+        page = manager.get_page()
+        page.goto(url, timeout=self.config.timeout * 1000)  # convert to ms
+        html = page.content()
+        page.close()
+        if len(html) > self.config.max_content_length:
             if not self.config.trim_excessive_content:
                 raise ValueError(f"Content length exceeds maximum of {self.config.max_content_length} bytes")
-            else:
-                text = text[: self.config.max_content_length]
-
-        return text
+            html = html[:self.config.max_content_length]
+        return html
 
     def _extract_metadata(self, soup: BeautifulSoup, doc: Document, url: str) -> WebpageMetadata:
         """

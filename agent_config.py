@@ -1,1 +1,2 @@
 DUMMY_LLM = False
+DUMMY_WEB = False

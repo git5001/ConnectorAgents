@@ -36,10 +36,10 @@ class ToolPort:
         self.direction: ToolPort.Direction = direction
         self.model: Type[BaseModel] = model
         self.uuid = uuid
-        self.connections: List[Tuple[ToolPort, Optional[Callable[[BaseModel], Union[BaseModel, List[BaseModel]]]]]] = []
+        self.connections: List[Tuple[ToolPort, Callable[[BaseModel], BaseModel], Callable[[BaseModel], bool], Tuple["ConnectedAgent", "ConnectedAgent"]]]  = []
         # Dynamc
-        self.queue: deque[Tuple[List[str], BaseModel]] = deque(maxlen=1000)
-        self.unconnected_outputs: deque[Tuple[List[str], BaseModel]] = deque(maxlen=1000)
+        self.queue: deque[Tuple[List[str], BaseModel]] = deque()
+        self.unconnected_outputs: deque[Tuple[List[str], BaseModel]] = deque()
 
     def size(self):
         """
@@ -56,7 +56,10 @@ class ToolPort:
         return len(self.unconnected_outputs)
 
     def connect(self, target_port: "ToolPort",
-                transformer: Optional[Callable[[BaseModel], Union[BaseModel, List[BaseModel]]]] = None) -> None:
+                transformer: Optional[Callable[[BaseModel], Union[BaseModel, List[BaseModel]]]] = None,
+                source=None,
+                target=None,
+                condition: Optional[Callable[[BaseModel], bool]] = None) -> None:
         """
         Connects an output port to an input port with an optional transformer.
 
@@ -64,6 +67,9 @@ class ToolPort:
             target_port (ToolPort): The target input port.
             transformer (Optional[Callable[[BaseModel], Union[BaseModel, List[BaseModel]]]], optional):
                 A function to transform messages before sending. Defaults to None.
+            source(Agent): Source agent
+            target(Agent): Target agent
+            condition(Optional[Callable[BaseModel]]): A condition function
 
         Raises:
             ValueError: If an invalid port direction is used.
@@ -73,7 +79,8 @@ class ToolPort:
         if target_port.direction != ToolPort.Direction.INPUT:
             raise ValueError("Can only connect OUTPUT to INPUT ports.")
 
-        self.connections.append((target_port, transformer, True))
+
+        self.connections.append((target_port, transformer, condition, (source,target)))
 
     def receive(self, message: BaseModel, parents: List[str]) -> None:
         """
@@ -105,23 +112,54 @@ class ToolPort:
         if self.direction != ToolPort.Direction.OUTPUT:
             raise ValueError("Only OUTPUT ports can send messages.")
 
+        result_ids = []
         if self.connections:
             msg_uuid = str(uuid.uuid4())
-            for target_port, transformer, dummy in self.connections:
+            for target_port, transformer, condition, dummy in self.connections:
+
+
                 transformed_message = transformer(message) if transformer else message
                 if isinstance(transformed_message, list):
                     list_len = len(transformed_message)
+                    # We need to correct list length for condition if set
+                    drop_idx_due_to_condition = set()
+                    # If we have a condition we must correct list length and store which idx we drop
+                    if condition:
+                        list_len = 0
+                        for idx, single_msg in enumerate(transformed_message):
+                            condition_result = condition(single_msg)
+                            if condition_result:
+                                list_len += 1
+                            else:
+                                drop_idx_due_to_condition.add(idx)
+
+                    # Loop for real
+                    real_idx = 0
                     for idx, single_msg in enumerate(transformed_message):
+                        if idx in drop_idx_due_to_condition:
+                            continue
                         tmp_parents = parents[:]
-                        tmp_parents.append(f"{msg_uuid}:{idx}:{list_len}")
+                        new_parent = f"{msg_uuid}:{real_idx}:{list_len}"
+                        tmp_parents.append(new_parent)
+                        result_ids.append(new_parent)
                         target_port.receive(single_msg, tmp_parents)
+                        real_idx += 1
                 else:
+                    # If we have a condition function we check if it returns false
+                    # if it does we omit the message
+                    if condition:
+                        condition_result = condition(transformed_message)
+                        if not condition_result:
+                            return result_ids
                     list_len = 1
                     tmp_parents = parents[:]
-                    tmp_parents.append(f"{msg_uuid}:0:{list_len}")
+                    new_parent = f"{msg_uuid}:0:{list_len}"
+                    tmp_parents.append(new_parent)
+                    result_ids.append(new_parent)
                     target_port.receive(transformed_message, tmp_parents)
         else:
             self.unconnected_outputs.append((parents, message))
+        return result_ids
 
     def get_final_outputs(self) -> List[BaseModel]:
         """
@@ -131,7 +169,7 @@ class ToolPort:
             List[BaseModel]: A list of final messages.
         """
         outputs = [item[1] for item in self.unconnected_outputs]
-        self.unconnected_outputs.clear()
+        # self.unconnected_outputs.clear()
         return outputs
 
     def get_one_output(self) -> Optional[BaseModel]:

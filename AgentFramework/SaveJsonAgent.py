@@ -9,8 +9,7 @@ from atomic_agents.lib.base.base_tool import BaseToolConfig
 
 from AgentFramework.ConnectedAgent import ConnectedAgent
 from AgentFramework.NullSchema import NullSchema
-
-rich_console = Console()
+from agent_logging import rich_console
 
 
 class SaveJsonAgentConfig(BaseToolConfig):
@@ -77,7 +76,7 @@ class SaveJsonAgent(ConnectedAgent):
             new_filename = f"{name}_{parent}{ext}"
         else:
             new_filename = self.filename
-
+        print("SAVIN G XXX ",new_filename, self._use_uuid)
         # Save the data to the specified JSON file
         self._save(new_filename)
         rich_console.print(f"[green]Saved JSON to {new_filename}[/green]")

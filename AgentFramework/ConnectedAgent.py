@@ -1,19 +1,15 @@
+import traceback
 from typing import Type, List, Optional, Dict, Callable, Union
-from rich.console import Console
-from pydantic import BaseModel
-import pickle
-import base64
-
 
 from atomic_agents.lib.base.base_io_schema import BaseIOSchema
 from atomic_agents.lib.base.base_tool import BaseTool, BaseToolConfig
+from pydantic import BaseModel
 
 from AgentFramework.NullSchema import NullSchema
 from AgentFramework.ToolPort import ToolPort
 from util.SchedulerException import SchedulerException
 from util.SerializeHelper import decode_payload, encode_payload
 
-rich_console = Console()
 
 class ConnectedAgent(BaseTool):
     """
@@ -32,6 +28,7 @@ class ConnectedAgent(BaseTool):
     state_schema: Optional[Type[BaseModel]] = None
     is_active: bool = True
     uuid: str = "default"
+    _debug:bool = False
 
     # Dynamic
     _state: Optional[BaseModel] = None
@@ -49,13 +46,14 @@ class ConnectedAgent(BaseTool):
             TypeError: If `input_schema` or `output_schema` is not defined in a subclass.
         """
         super().__init__(config)
+        self._debug = False
         if not self.input_schema or not self.output_schema:
             raise TypeError("Each ConnectedAgent subclass must define `input_schema` and `output_schema`.")
         self.uuid = uuid
 
         if create_ports:
-            self._input_port: ToolPort = ToolPort(ToolPort.Direction.INPUT, self.input_schema, self.__class__.__name__)
-            self._output_port: ToolPort = ToolPort(ToolPort.Direction.OUTPUT, self.output_schema, self.__class__.__name__)
+            self._input_port: ToolPort = ToolPort(ToolPort.Direction.INPUT, self.input_schema, f"{uuid}:{self.__class__.__name__}")
+            self._output_port: ToolPort = ToolPort(ToolPort.Direction.OUTPUT, self.output_schema, f"{uuid}:{self.__class__.__name__}")
 
 
     @property
@@ -74,17 +72,25 @@ class ConnectedAgent(BaseTool):
     def output_port(self, value):
         self._output_port = value
 
-    def connectTo(self, target_agent: "ConnectedAgent",
+    def queque_size(self):
+        return f"{len(self._input_port.queue)}"
+
+
+    def connectTo(self,
+                  target_agent: "ConnectedAgent",
                   transformer: Optional[Callable[[BaseModel], Union[BaseModel, List[BaseModel]]]] = None,
-                  target_port_name:str = None
+                  target_port_name:str = None,
+                  condition: Optional[Callable[[BaseModel], bool]] = None,
                   ) -> None:
         """
         Connects an output port to an input port with an optional transformer.
 
         Args:
-            target_port (ToolPort): The target input port.
+            target_agent (ConenctedAgent): The target agent.
             transformer (Optional[Callable[[BaseModel], Union[BaseModel, List[BaseModel]]]], optional):
                 A function to transform messages before sending. Defaults to None.
+            target_port_name(str): optional target port name, for multi port agents
+            condition(Optional[Callable[BaseModel]]): A condition function
 
         Raises:
             ValueError: If an invalid port direction is used.
@@ -92,7 +98,7 @@ class ConnectedAgent(BaseTool):
 
         input_port = target_agent._find_input_port(target_port_name)
         output_port = self._find_output_port()
-        output_port.connect(input_port, transformer=transformer)
+        output_port.connect(input_port, transformer=transformer, source=self, target=target_agent, condition=condition)
 
     def _find_input_port(self, source_port_name:str = None):
 
@@ -122,6 +128,12 @@ class ConnectedAgent(BaseTool):
         """
         self.input_port.receive(message,[])
 
+    def clear_final_outputs(self) -> None:
+        """
+        Clear remaining data
+        """
+        self.output_port.unconnected_outputs.clear()
+
     def get_final_outputs(self) -> List[BaseModel]:
         """
         Retrieves and clears all stored outputs from the output port.
@@ -148,9 +160,13 @@ class ConnectedAgent(BaseTool):
         Returns:
             bool: True if processing occurred, False otherwise.
         """
-        if self.input_port.queue:
-            parents, input_msg = self.input_port.queue.popleft()
-            rich_console.print(f"[blue]Running agent {self.__class__.__name__}[/blue] parents={len(parents)}")
+        # Check if we have a full queque or we are an inital agent which acts as source
+        if self.input_port.queue or self.input_schema is NullSchema:
+            if self.input_schema is NullSchema:
+                parents, input_msg = [], NullSchema()
+            else:
+                parents, input_msg = self.input_port.queue.popleft()
+            # rich_console.print(f"   [blue]Running connected agent {self.__class__.__name__}[/blue] parents={len(parents)}")
             try:
                 output_msg = self.process(input_msg, parents)
             except Exception as e:
@@ -160,8 +176,11 @@ class ConnectedAgent(BaseTool):
                 raise SchedulerException(self.__class__.__name__, "Processing step failed", e)
 
             if output_msg and not isinstance(output_msg, NullSchema):
-                self.output_port.send(output_msg, parents)
+                result_parents = self.output_port.send(output_msg, parents)
             return True
+        else:
+            # rich_console.print(f"   [grey53]No input for connected agent {self.__class__.__name__}[/grey53]")
+            pass
         return False
 
     def process(self, params: BaseIOSchema, parents: List[str]) -> BaseIOSchema:
@@ -205,18 +224,15 @@ class ConnectedAgent(BaseTool):
 
 
 
-
-
-
-
     def save_state(self) -> dict:
         """
         Save the agent's state to a dictionary, including all ports returned by _gather_ports().
         """
         state_dict = {
-            "state": self._state.model_dump() if self._state else None,
+            "state": encode_payload(self._state) if self._state else None,
             "ports": {}
         }
+
 
         # Dump each port the agent knows about
         for port_name, port_obj in self._gather_ports().items():
@@ -231,7 +247,21 @@ class ConnectedAgent(BaseTool):
         """
         # Restore the agent's private state
         if state_dict.get("state") and self.state_schema:
-            self._state = self.state_schema(**state_dict["state"])
+            try:
+                real_data = decode_payload(state_dict["state"])  # might become a dict or a raw object
+            except Exception as e:
+                print("Failed to decode state", e)
+                print("  Error state", state_dict["state"])
+                raise SchedulerException(self.__class__.__name__, "Failed to decode state", e)
+            if isinstance(real_data, dict) and self.state_schema is not None:
+                # Attempt to parse with pydantic
+                try:
+                    self._state = self.state_schema(**real_data)
+                except Exception as e:
+                    print(f"[safe_model_load] Could not parse schema: {e}")
+                    return (None, None)
+            else:
+                self._state = real_data
 
         # Load data for each known port
         for port_name, port_obj in self._gather_ports().items():
@@ -279,6 +309,7 @@ class ConnectedAgent(BaseTool):
                 return (msg_ids, encoded)
             except Exception as e:
                 print(f"[safe_model_dump] Failed to encode message: {e}")
+                traceback.print_exc()
                 return (None, None)
 
         return {

@@ -17,3 +17,4 @@ email_validator>=2.0.0
 
 json5~=0.10.0
 tenacity~=9.0.0
+

@@ -6,8 +6,7 @@ from atomic_agents.lib.base.base_tool import BaseToolConfig
 
 from AgentFramework.ConnectedAgent import ConnectedAgent
 from AgentFramework.NullSchema import NullSchema
-
-rich_console = Console()
+from agent_logging import rich_console
 
 
 class DebugAgentConfig(BaseToolConfig):

@@ -7,8 +7,7 @@ from atomic_agents.lib.base.base_io_schema import BaseIOSchema
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 
 from AgentFramework.ConnectedAgent import ConnectedAgent
-
-rich_console = Console()
+from agent_logging import rich_console
 
 
 class LoadJsonAgentConfig(BaseToolConfig):
