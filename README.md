@@ -81,7 +81,7 @@ scheduler.step_all()
 ```
 
 ### Visualization
-Exmample pipepine:
+Example pipeline:
 ![News Pipeline](https://github.com/git5001/ConnectorAgents/blob/main/doc/pic/pipeline_news_large.png)
 
 
