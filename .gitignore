@@ -13,3 +13,7 @@
 *.pyc
 **/*.pyc
 
+/AgentMultiPort/test/*.env
+/AgentDeepResearch/test/*.env
+**/.env
+**/*.env

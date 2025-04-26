@@ -79,60 +79,80 @@ def find_common_complete_uuids(sub_lists: List[List[str]]) -> List[str]:
     #       "indices": set([ ... counters ... ]),
     #       "lengths": set([ ... lengths ... ])
     #   }
-    sub_list_dicts = []
-    sub_list_uuid_sets = []  # track just the UUIDs in each sub-list
+    from collections import defaultdict
+    from typing import List
+
+    if not sub_lists:  # empty input guard
+        return []
+
+    # -----------------------------------------------
+    # 1) Parse each sub-list -> per-UUID meta-data
+    # -----------------------------------------------
+    per_list_meta = []  # one dict per sub-list
+    per_list_uuid_sets = []  # and the plain set of uuids
 
     for s_list in sub_lists:
         d = defaultdict(lambda: {"indices": set(), "lengths": set()})
-        uuid_set = set()
         for item in s_list:
-            parts = item.split(":")
-            if len(parts) != 3:
-                continue  # skip malformed items
-            uuid_val, idx_str, length_str = parts
             try:
+                uuid_val, idx_str, length_str = item.split(":")
                 idx = int(idx_str)
                 length = int(length_str)
-            except ValueError:
-                continue  # skip if counters not parseable
+            except (ValueError, IndexError):
+                continue  # skip malformed entries
 
             d[uuid_val]["indices"].add(idx)
             d[uuid_val]["lengths"].add(length)
-            uuid_set.add(uuid_val)
+        per_list_meta.append(d)
+        per_list_uuid_sets.append(set(d.keys()))
 
-        sub_list_dicts.append(d)
-        sub_list_uuid_sets.append(uuid_set)
+    # -------------------------------------------------
+    # 2) Which UUIDs occur in *every* sub-list?
+    # -------------------------------------------------
+    common_uuids = set.intersection(*per_list_uuid_sets)
 
-    if not sub_list_uuid_sets:
-        return []
+    # -------------------------------------------------
+    # 3) Respect the sequence of the first sub-list
+    # -------------------------------------------------
+    ordered_common = []
+    seen = set()
+    for item in sub_lists[0]:
+        uuid_val = item.split(":")[0]
+        if uuid_val in common_uuids and uuid_val not in seen:
+            ordered_common.append(uuid_val)
+            seen.add(uuid_val)
 
-    # 1) Find intersection of *all* UUIDs across sub-lists
-    common_uuids = set.intersection(*sub_list_uuid_sets)
-
-    # 2) For each UUID in the intersection, gather all counters from all sub-lists
-    #    and check if we have a full 0..(L-1).
-    final_uuids = []
-
-    for uuid_val in common_uuids:
-        all_indices = set()
+    # -------------------------------------------------
+    # 4) Apply the relaxed “same length” test
+    # -------------------------------------------------
+    result = []
+    for uuid_val in ordered_common:
         all_lengths = set()
-        # Union the counters/lengths from each sub-list that has this UUID
-        for d in sub_list_dicts:
-            if uuid_val in d:
-                all_indices |= d[uuid_val]["indices"]
-                all_lengths |= d[uuid_val]["lengths"]
+        for d in per_list_meta:
+            all_lengths |= d.get(uuid_val, {}).get("lengths", set())
 
-        if not all_lengths:
-            continue  # no known length -> skip
+        # keep the UUID if every list uses the *same* length
+        if len(all_lengths) == 1:
+            result.append(uuid_val)
 
-        # If there's more than one length, we can choose to check them all
-        # or assume they're consistent. Let's take the *max* length found,
-        # and verify counters 0..(max_length-1).
-        max_length = max(all_lengths)
-        needed_indices = set(range(max_length))
-        if needed_indices.issubset(all_indices):
-            final_uuids.append(uuid_val)
+    return result
 
-    # Sort if you want a stable order
-    final_uuids.sort()
-    return final_uuids
+
+def find_last_non_one(items):
+    """
+    Find the last item in a parent list which has a len > 1
+    and return it
+    :param items: parents
+    :return: the length
+    """
+    for item in reversed(items):
+        parts = item.split(':')
+        if len(parts) != 3:
+            raise ValueError(f"Malformed item: {item}")
+        try:
+            val = int(parts[-1])
+        except ValueError:
+            raise ValueError(f"Invalid integer in item: {item}")
+        if val != 1:
+            return val
+    return 1

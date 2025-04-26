@@ -6,7 +6,6 @@ from typing import List
 
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 from dotenv import load_dotenv
-from openai import NOT_GIVEN
 from pydantic import HttpUrl, TypeAdapter
 
 from AgentBookmarks.WebpageToCategoryAgent import WebpageToCategoryAgent, WebpageToCategoryInput, BookmarkOutput
@@ -57,9 +56,6 @@ def main():
 
     USE_LARGE_MODELS = True
 
-    #OLLAMA_MODEL = "llama3.2:1b" # test only
-
-
     if not USE_LARGE_MODELS:
         OLLAMA_MODEL = "qwen2.5:7b" # fast, good
         OPENAI_MODEL = "gpt-4o-mini"
@@ -67,13 +63,14 @@ def main():
         #OPENAI_MODEL = "o4-mini"
     else:
         OLLAMA_MODEL = "qwen2.5:14b" # fits
-        # OLLAMA_MODEL = "gemma3:12b"  # fits 90%  # 7141.59 @250
+        # OLLAMA_MODEL = "gemma3:12b"  # fits 90% VRAM
         OPENAI_MODEL = "gpt-4o"
         OPENAI_MODEL = "gpt-4.1"
         #OPENAI_MODEL = "o4-mini"
     OPENAI_MODEL_FINAL = "gpt-4o-mini"
 
 
+    SHORT_LOOP_CNT = 10  # -> 3510
     SHORT_LOOP_CNT = None  # -> 3510
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -302,10 +299,10 @@ def main():
     # Print pipeline
     printer = PipelinePrinter(is_ortho=False, direction='TB', fillcolor='blue', show_schemas=True,schema_fillcolor='moccasin')
     printer.print_ascii(scheduler.agents)
-    printer.to_png(scheduler.agents, 'r:/pipeline_bookmarks_large.png')
+    printer.save_as_png(scheduler.agents, 'r:/pipeline_bookmarks_large.png')
     printer = PipelinePrinter(is_ortho=False, direction='TB', fillcolor='blue')
     printer.print_ascii(scheduler.agents)
-    printer.to_png(scheduler.agents, 'r:/pipeline_bookmarks.png')
+    printer.save_as_png(scheduler.agents, 'r:/pipeline_bookmarks.png')
     #return
 
 

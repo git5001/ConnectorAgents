@@ -5,6 +5,7 @@ from rich.console import Console
 
 from AgentFramework.ListCollectionAgent import ListModel
 from AgentFramework.PiplinePrinter import PipelinePrinter
+from AgentFramework.TCPDebugger import TCPDebugger
 from AtomicTools.tavily_search.tool.tavily_search import TavilySearchToolConfig, TavilySearchToolOutputSchema, TavilySearchToolInputSchema
 from AtomicTools.webpage_scraper.tool.webpage_scraper import WebpageScraperToolConfig, WebpageScraperToolInputSchema, WebpageScraperToolOutputSchema
 
@@ -28,6 +29,7 @@ def main():
     ########################################################################
     # Search configuration
     ########################################################################
+    USE_DEBUGGER = False             # connect debugger
     AMOUNT = 3                       # How many news to search and process
     DAYS = 10                        # How many days should the searfch look back
     TOPIC = "All about openai GPT-5" # Seach topic
@@ -158,10 +160,16 @@ def main():
     # ------------------------------------------------------------------------------------------------
 
 
+    # ------------------------------------------------------------------------------------------------
+    # Debugger
+    if USE_DEBUGGER:
+        debugger = TCPDebugger(start_paused=True)
+    else:
+        debugger = False
 
     # ------------------------------------------------------------------------------------------------
     # Scheduler
-    scheduler:AgentScheduler = AgentScheduler()
+    scheduler:AgentScheduler = AgentScheduler(debugger=debugger)
     scheduler.add_agent(tavilyAgent)
     scheduler.add_agent(webScraper)
     scheduler.add_agent(llmAgent)
@@ -178,10 +186,10 @@ def main():
     # Print pipeline
     printer = PipelinePrinter(is_ortho=True, direction='TB', fillcolor='blue')
     printer.print_ascii(scheduler.agents)
-    printer.to_png(scheduler.agents,  'r:/pipeline_news.png')
+    printer.save_as_png(scheduler.agents, 'r:/pipeline_news.png')
     printer = PipelinePrinter(is_ortho=True, direction='TB', fillcolor='blue', show_schemas = True, schema_fillcolor = 'moccasin')
     printer.print_ascii(scheduler.agents)
-    printer.to_png(scheduler.agents,  'r:/pipeline_news_large.png')
+    printer.save_as_png(scheduler.agents, 'r:/pipeline_news_large.png')
     #return
 
 

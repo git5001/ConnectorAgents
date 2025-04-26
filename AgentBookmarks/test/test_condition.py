@@ -98,13 +98,22 @@ def main():
     printer = PipelinePrinter(is_ortho=False, direction='LR', fillcolor='blue')
     printer.print_ascii(scheduler.agents)
     printer.to_dot(scheduler.agents,)
-    printer.to_png(scheduler.agents,  'r:/pipeline_condition.png')
+    printer.save_as_png(scheduler.agents, 'r:/pipeline_condition.png')
 
     printer = PipelinePrinter(is_ortho=False, direction='LR', fillcolor='blue', show_schemas=True,schema_fillcolor='moccasin')
     printer.print_ascii(scheduler.agents)
     printer.to_dot(scheduler.agents,)
-    printer.to_png(scheduler.agents,  'r:/pipeline_condition_large.png')
+    printer.save_as_png(scheduler.agents, 'r:/pipeline_condition_large.png')
+    printer.save_as_dot(scheduler.agents, 'r:/pipeline_condition_large.dot')
 
+
+    printer = PipelinePrinter(direction="LR", show_schemas=True, schema_fillcolor="#FFD")
+    printer.save_as_mermaid(scheduler.agents, 'r:/pipeline_condition_large.mmd')
+    printer = PipelinePrinter(direction="LR", show_schemas=False, schema_fillcolor="#FFD")
+    printer.save_as_mermaid(scheduler.agents, 'r:/pipeline_condition.mmd')
+
+    # Optional render to SVG/PNG (requires the Mermaid CLI):
+    #   $ mmdc -i pipeline.mmd -o pipeline.svg
 
     rich_console.print(f"[red]Feeding agenty initially[/red]")
 
@@ -112,7 +121,9 @@ def main():
     # ------------------------------------------------------------------------------------------------
     # Loop all
     start_time = time.perf_counter()
-    scheduler.step_all()
+    goon = scheduler.step()
+    scheduler.save_scheduler(SAVE_DIR)
+    scheduler.save_scheduler(SAVE_DIR)
     end_time = time.perf_counter()
     execution_time = end_time - start_time
     print(f"Execution time: {execution_time:.2f} seconds")

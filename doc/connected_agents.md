@@ -215,12 +215,12 @@ Sometimes you just want a **quick, human‑readable picture** of how your agents
 
 ```python
     printer = PipelinePrinter(is_ortho=False,
-    						  direction='TB',
+                              direction='TB',
                               fillcolor='blue',
                               show_schemas=True,
                               schema_fillcolor='moccasin')
-    printer.print_ascii(scheduler.agents)
-    printer.to_png(scheduler.agents,  'pipeline_bookmarks.png') # if 'dot' available
+printer.print_ascii(scheduler.agents)
+printer.save_as_png(scheduler.agents, 'pipeline_bookmarks.png')  # if 'dot' available
 ```
 
 _Output example ‘(ASCII)’:_

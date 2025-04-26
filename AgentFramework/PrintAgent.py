@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from pydantic import BaseModel, Field
 from rich.console import Console
@@ -18,6 +19,7 @@ class PrintAgentConfig(BaseToolConfig):
     """
     log_to_file: bool = Field(False, description="If true, logs output to a file instead of just printing")
     log_file_path: Optional[str] = Field(None, description="File path for logging output if enabled")
+    log_console: bool = Field(True, description="If true, logs output console")
 
 
 class PrintMessageInput(BaseModel):
@@ -25,11 +27,11 @@ class PrintMessageInput(BaseModel):
     Schema for a printable message.
 
     Attributes:
-        subject (str): Message subject.
-        body (str): Message body content.
+        subject (Optional[str]): Message subject.
+        body (Optional[str]): Message body content.
     """
-    subject: str = Field(..., description="Message subject")
-    body: str = Field(..., description="Message body content")
+    subject: Optional[str] = Field(None, description="Message subject")
+    body: Optional[str] = Field(None, description="Message body content")
 
 
 class PrintMessageOutput(BaseModel):
@@ -68,6 +70,7 @@ class PrintAgent(ConnectedAgent):
         super().__init__(config, uuid)
         self.log_to_file: bool = config.log_to_file
         self.log_file_path: Optional[str] = config.log_file_path
+        self.log_to_console: bool = config.log_console
 
     def print_message(self, message: PrintMessageInput) -> PrintMessageOutput:
         """
@@ -79,17 +82,36 @@ class PrintAgent(ConnectedAgent):
         Returns:
             PrintMessageOutput: Contains success status and message.
         """
-        output_text = (f"[bold red]PRINT AGENT OUTPUT[/bold red]\n"
-                       f"[bold blue]# {message.subject}[/bold blue]\n\n"
-                       f"[green]{message.body}[/green]\n"
-                       f"-----------------------------------------------------\n")
+
+        # TEXT version
+        parts = ["[bold red]PRINT AGENT OUTPUT[/bold red]"]
+        if message.subject:
+            parts.append(f"[bold blue]# {message.subject}[/bold blue]")
+        if message.body:
+            parts.append(f"[green]{message.body}[/green]")
+        parts.append("-----------------------------------------------------")
+        output_text = "\n\n".join(parts) + "\n"
+
+        # MARKDOWN version
+        md_parts = []
+        if message.subject:
+            md_parts.append(f"# {message.subject}")
+        if message.body:
+            md_parts.append(message.body)
+        md_parts.append("---")
+        output_md = "\n\n".join(md_parts) + "\n"
 
         try:
-            rich_console.print(output_text)
+            if self.log_to_console:
+                rich_console.print(output_text)
 
             if self.log_to_file and self.log_file_path:
-                with open(self.log_file_path, "a", encoding="utf-8") as log_file:
-                    log_file.write(output_text + "\n")
+                rich_console.print(f"[green]Printed text to file {self.log_file_path}[/green]")
+                log_dir = os.path.dirname(self.log_file_path)
+                if log_dir:  # avoid trying to create an empty path
+                    os.makedirs(log_dir, exist_ok=True)
+                with open(self.log_file_path, "w", encoding="utf-8") as log_file:
+                    log_file.write(output_md + "\n")
 
             return PrintMessageOutput(success=True, message="Message printed successfully.")
         except Exception as e:

@@ -116,8 +116,6 @@ class ToolPort:
         if self.connections:
             msg_uuid = str(uuid.uuid4())
             for target_port, transformer, condition, dummy in self.connections:
-
-
                 transformed_message = transformer(message) if transformer else message
                 if isinstance(transformed_message, list):
                     list_len = len(transformed_message)
@@ -150,7 +148,7 @@ class ToolPort:
                     if condition:
                         condition_result = condition(transformed_message)
                         if not condition_result:
-                            return result_ids
+                            continue
                     list_len = 1
                     tmp_parents = parents[:]
                     new_parent = f"{msg_uuid}:0:{list_len}"

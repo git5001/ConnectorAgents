@@ -8,6 +8,7 @@ from atomic_agents.lib.base.base_io_schema import BaseIOSchema
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 
 from AgentFramework.ConnectedAgent import ConnectedAgent
+from AgentFramework.InfiniteSchema import InfiniteSchema
 from AgentFramework.ListCollectionAgent import ListModel
 from AgentFramework.NullSchema import NullSchema
 from agent_logging import rich_console
@@ -39,7 +40,7 @@ class CountNumbersAgent(ConnectedAgent):
         input_schema (Type[BaseIOSchema]): Defines the expected input schema.
         output_schema (Type[BaseModel]): Output schema.
     """
-    input_schema = NullSchema
+    input_schema = InfiniteSchema
     output_schema = CountNumbersAgentSchema
 
     def __init__(self, config: BaseToolConfig, uuid:str = 'default') -> None:

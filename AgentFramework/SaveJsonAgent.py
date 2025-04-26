@@ -70,13 +70,14 @@ class SaveJsonAgent(ConnectedAgent):
         self._data = params
 
         if self._use_uuid:
-            cleaned_list = [item.split(':')[0] if ':' in item else item for item in parents]
-            parent = cleaned_list[-1]
+            # cleaned_list = [item.split(':')[0] if ':' in item else item for item in parents]
+            # parent = cleaned_list[-1]
+            parent = parents[-1] or ""
+            parent = parent.replace(":","_")
             name, ext = os.path.splitext(self.filename)
             new_filename = f"{name}_{parent}{ext}"
         else:
             new_filename = self.filename
-        print("SAVIN G XXX ",new_filename, self._use_uuid)
         # Save the data to the specified JSON file
         self._save(new_filename)
         rich_console.print(f"[green]Saved JSON to {new_filename}[/green]")
@@ -90,6 +91,11 @@ class SaveJsonAgent(ConnectedAgent):
             filepath (str): The path to the JSON file.
         """
         if self._data is not None:
+            # Ensure the directory exists
+            dir_path = os.path.dirname(filepath)
+            if dir_path:  # skip if filepath is just a filename in the current directory
+                os.makedirs(dir_path, exist_ok=True)
+
             # Create a TypeAdapter for the type of the data received
             adapter = TypeAdapter(type(self._data))
             # dump_json returns bytes; decode to get a string

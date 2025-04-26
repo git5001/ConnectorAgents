@@ -1,8 +1,8 @@
-from typing import Optional
+from typing import Optional, Type
 
 import instructor
 from openai import OpenAI
-from pydantic import Field
+from pydantic import Field, BaseModel
 
 from atomic_agents.agents.base_agent import BaseAgent, BaseAgentConfig
 from atomic_agents.lib.base.base_io_schema import BaseIOSchema
@@ -15,6 +15,10 @@ from AgentFramework.ConnectedAgent import ConnectedAgent
 from AgentNews.NewsSchema import LLMNewsInput, LLMNewsOutput
 from agent_config import DUMMY_LLM
 
+
+class DebugModel(BaseModel):
+    system: str
+    history: str
 
 class LLMNewsAgentConfig(BaseToolConfig):
     """
@@ -94,3 +98,28 @@ class LLMNewsAgent(BaseAgent, ConnectedAgent):
                                  news_content="Dummy content")
         else:
             return super().run(user_input)
+
+
+
+    def get_response(self, response_model=None) -> Type[BaseModel]:
+        """
+        For debugging we overwrite
+        :param response_model:
+        :return: data
+        """
+        if self.debugger:
+            system_prompt = self.system_prompt_generator.generate_prompt()
+            history = self.memory.get_history()
+
+            # Turn history (list of dicts) into a readable string
+            history_str = "\n".join(f"{m['role']}: {m['content']}" for m in history)
+
+            debug_data = DebugModel(system=system_prompt, history=history_str)
+
+            self.debugger.user_message(
+                name="LLM Prompt",
+                agent=self,
+                data=debug_data
+            )
+
+        return super().get_response(response_model)

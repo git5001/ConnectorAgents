@@ -87,7 +87,7 @@ class FinalCollectPortAggregatorAgent(MultiPortAggregatorAgent):
         # ---------- build final path ----------
         return f"{main_category}/{sub_category}" if sub_category else main_category
 
-    def run(self, inputs: Dict[str, Tuple[str, BaseModel]]) -> BaseModel:
+    def run(self, inputs: Dict[str, BaseModel]) -> BaseModel:
         """
         Merges search results, web scraping data, and LLM-generated content into a single structured output.
 

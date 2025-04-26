@@ -20,11 +20,13 @@ class MultiPortAggregatorAgent(ConnectedAgent):
     Attributes:
         input_schemas (Dict[str, Type[BaseModel]]): Defines multiple input schemas.
         output_schema (Type[BaseModel]): Defines the expected output schema.
+        output_schemas (Type[BaseModel]): Defines the expected output schemas.
         _input_ports (Dict[str, ToolPort]): Manages multiple input ports.
         output_port (ToolPort): Handles outgoing processed messages.
     """
     input_schemas: Dict[str, Type[BaseModel]] = {}
     output_schema: Type[BaseModel] = None
+    output_schemas: List[Type[BaseModel]] = None
     input_schema: BaseModel = BaseIOSchema
 
     def __init__(self, config: BaseToolConfig = BaseToolConfig(), uuid:str = 'default') -> None:
@@ -49,7 +51,17 @@ class MultiPortAggregatorAgent(ConnectedAgent):
             name: ToolPort(ToolPort.Direction.INPUT, schema, f"{uuid}:{self.__class__.__name__}")
             for name, schema in self.input_schemas.items()
         }
-        self.output_port: ToolPort = ToolPort(ToolPort.Direction.OUTPUT, self.output_schema, f"{uuid}:{self.__class__.__name__}")
+        self._output_ports = {}
+
+        if self.output_schema is not None:
+            self._output_ports[self.output_schema]: ToolPort = ToolPort(ToolPort.Direction.OUTPUT, self.output_schema,
+                                                                        f"{uuid}:{self.__class__.__name__}")
+        else:
+            port_cnt = 0
+            for output_schema in self.output_schemas:
+                self._output_ports[output_schema]: ToolPort = ToolPort(ToolPort.Direction.OUTPUT, output_schema,
+                                                                       f"{uuid}:{self.__class__.__name__}#{port_cnt}")
+                port_cnt += 1
 
     @property
     def input_port(self):
@@ -223,15 +235,19 @@ class MultiPortAggregatorAgent(ConnectedAgent):
 
 
         try:
+            if self.debugger:
+                for data in model_map.values():
+                    self.debugger.input(self, data, parents)
             output_msg = self.run(model_map)
+            if self.debugger:
+                self.debugger.output(self, output_msg, parents)
         except Exception as e:
             for del_name, del_idx, removed_item in staged_removals:
                 self._input_ports[del_name].queue.insert(del_idx, removed_item)
             # Raise a scheduler-specific exception for higher-level handling
             raise SchedulerException(self.__class__.__name__, "Processing multi step failed", e)
 
-        if output_msg:
-            self.output_port.send(output_msg, join_parents)
+        self._send_output_msg(output_msg, join_parents)
 
         return True
 
@@ -249,13 +265,22 @@ class MultiPortAggregatorAgent(ConnectedAgent):
           "output_port": <ToolPort>
         }
         """
-        all_ports = {}
+        ports = {}
         # Add each input port by its dictionary key
         for in_name, port in self._input_ports.items():
-            all_ports[f"input_{in_name}"] = port  # or just use in_name directly
-        # Add the single output port
-        all_ports["output_port"] = self.output_port
-        return all_ports
+            ports[f"input_{in_name}"] = port  # or just use in_name directly
+
+            # ---- new multi‑output mapping --------------------------------------
+        if getattr(self, "_output_ports", None):
+            for schema, port in self._output_ports.items():
+                if port is not None:
+                    ports[f"output_ports:{schema.__name__}"] = port
+
+            # ---- legacy single output ------------------------------------------
+            # (keep so we can still restore really old checkpoints)
+        if getattr(self, "_output_port", None):
+            ports["output_port"] = self._output_port
+        return ports
 
     def load_state(self, state_dict: dict):
         """

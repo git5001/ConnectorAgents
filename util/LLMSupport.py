@@ -113,7 +113,7 @@ class LLMModel:
         if config.base_url:
             self.base_url = config.base_url
 
-        if config.max_token is not None:
+        if config.max_token not in (None, NOT_GIVEN):
             if self._maxToken == NOT_GIVEN:
                 self._maxToken = config.max_token
             else:
@@ -180,13 +180,13 @@ class LLMModel:
         if not temperature:
             temperature = NOT_GIVEN
 
-        logger.info(f"Calling model {self.model()} chat completions token={self._maxToken} temperature={temperature}")
+        logger.info(f"Calling model {self.model()} chat completions max token={self._maxToken} temperature={temperature}")
         maxToken = self._maxToken
         maxCompletionToken = NOT_GIVEN
         if self._thinking:
             maxCompletionToken = self._maxToken
             maxToken =  NOT_GIVEN
-
+            temperature = NOT_GIVEN
         response = self.client.chat.completions.create(model=self._model,
                                                        messages=messages,
                                                        temperature=temperature,
@@ -252,6 +252,7 @@ class LLMModel:
         if self._thinking:
             maxCompletionToken = self._maxToken
             maxToken =  NOT_GIVEN
+            temperature = NOT_GIVEN
         response = self.client.chat.completions.create(model=self._model,
                                                        messages=messages,
                                                        response_format=response_format,

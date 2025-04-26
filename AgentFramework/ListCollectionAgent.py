@@ -5,7 +5,7 @@ from atomic_agents.lib.base.base_tool import BaseToolConfig
 from pydantic import BaseModel, Field
 
 from AgentFramework.ConnectedAgent import ConnectedAgent
-from AgentFramework.listutil import find_common_complete_uuids, compare_lists
+from AgentFramework.listutil import find_common_complete_uuids, compare_lists, find_last_non_one
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -92,8 +92,14 @@ class ListCollectionAgent(ConnectedAgent):
         if not self._state.data:
             self._state.data.append((params, cleaned_list, parents))
             return None
-
+        # check we havew all items
+        list_length = find_last_non_one(parents)
         self._state.data.append((params, cleaned_list, parents))
+
+        # not enogugh items yet
+        if len(self._state.data) < list_length:
+            return None
+
         parents_list = [item[2] for item in self._state.data]
         cleaned_common_sublists = find_common_complete_uuids(parents_list)
 
@@ -103,18 +109,15 @@ class ListCollectionAgent(ConnectedAgent):
         new_data: List[Tuple[BaseIOSchema, List[str], List[str]]] = []
         output_data: List[BaseIOSchema] = []
         cleaned_sublist = cleaned_common_sublists[:1]
-
         for data_params, data_cleaned_list, data_parents in self._state.data:
             if not compare_lists(data_cleaned_list, cleaned_sublist):
                 new_data.append((data_params, data_cleaned_list, data_parents))
             else:
                 output_msg = self.run(data_params)
                 output_data.append(output_msg)
-
         self._state.data = new_data
 
         self._replace_if_needed(parents, len(cleaned_common_sublists)-1)
-
         outputList = ListModel(data=output_data)
 
         return outputList

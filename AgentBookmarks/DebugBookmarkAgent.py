@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from rich.console import Console
+
 
 from atomic_agents.lib.base.base_io_schema import BaseIOSchema
 from atomic_agents.lib.base.base_tool import BaseToolConfig

@@ -33,19 +33,43 @@ class AgentScheduler:
         error_dir: Store agents there if we had an error or None
         save_step: After how many steps shall we save
     """
+    debugger: "DebugInterface"
+    agents: List["ConnectedAgent"]
+    save_dir: str
+    error_dir: str
+    save_step: int
+    state: AgentSchedulerState
 
-    def __init__(self, save_dir:str = None, error_dir:str = None, save_step:int = 1) -> None:
+    def __init__(self,
+                 save_dir:str = None,
+                 error_dir:str = None,
+                 save_step:int = 1,
+                 global_state:BaseModel=None,
+                 debugger:"DebugInterface" = None) -> None:
         """Initializes an empty agent scheduler."""
-        self.agents: List[ConnectedAgent] = []
+        self.agents = []
         self.save_dir = save_dir
         self.error_dir = error_dir
         self.save_step = save_step
+        self._global_state = global_state
+        self.debugger = debugger
+        if self.debugger:
+            self.debugger.init_debugger()
         self.state = AgentSchedulerState(agent_idx=0, step_counter=0, all_done_counter=0)
 
         if self.save_dir is not None:
             os.makedirs(self.save_dir, exist_ok=True)
         if self.error_dir is not None:
             os.makedirs(self.error_dir, exist_ok=True)
+
+
+    def close(self):
+        """
+        Close debugger etc
+        :return:
+        """
+        if self.debugger:
+            self.debugger.exit_debugger()
 
     def add_agent(self, agent: ConnectedAgent, skipAgent=False) -> None:
         """
@@ -55,6 +79,11 @@ class AgentScheduler:
             agent (ConnectedAgent): The agent instance to add.
         """
         if not skipAgent:
+            if self.debugger:
+                agent.debugger = self.debugger
+            if self._global_state is not None:
+                print("Agent is ",type(agent))
+                agent.global_state = self._global_state
             self.agents.append(agent)
 
 
@@ -68,103 +97,131 @@ class AgentScheduler:
             sizes[f"{agent.__class__.__name__}#{id(agent)}"] = agent.queque_size()
         return sizes
 
-    def step_all(self) -> int:
+    # ------------------------------------------------------------------ #
+    # 1) do the actual work for exactly ONE agent ---------------------- #
+    # ------------------------------------------------------------------ #
+    def _step_one_agent(self) -> bool:
         """
-        Loop over agents until all are done. We call `step()` repeatedly, which
-        runs exactly ONE agent, then move to the next. Once every agent returns
-        False consecutively, we break.
-
-        :return: The step counter
+        Low‑level helper: run the agent that `self.state.agent_idx` points at,
+        advance all indices, and return True if that agent did any work.
         """
-        # Initialize a new persistent counter if it doesn't exist yet
-        self.state.all_done_counter = 0
-
-        rich_console.print(f"[red]Start scheduler at step {self.state.step_counter} agents={len(self.agents)}[/red]")
-
-        while True:
-            round = int(self.state.step_counter // len(self.agents))
-            if self.state.agent_idx == 0:
-                rich_console.print(f"[red]Executing scheduler step {round}|{self.state.agent_idx} / done={self.state.all_done_counter}/{len(self.agents)}  -------------------------------------[/red]")
-            #rich_console.print(f"Queue sizes:\n{json.dumps(self.queque_sizes(), indent=4)}")
-
-            # Execute exactly one agent and increase agent_idx
-            did_run = self.step()
-
-            if not did_run:
-                self.state.all_done_counter += 1
-
-                # If we've seen `False` for every agent in a row, we are done
-            if self.state.all_done_counter >= len(self.agents):
-                rich_console.print(f"[red]No active agent found scheduler step {round} / {self.state.all_done_counter} / {len(self.agents)} [/red]")
-                break
-
-            # Save progress after one round robin
-            if self.state.agent_idx == 0:
-                self.state.all_done_counter = 0
-                if self.save_dir is not None and round % self.save_step == 0:
-                    dir = f"{self.save_dir}/step_{round}"
-                    os.makedirs(dir, exist_ok=True)
-                    self.save_state(dir)
-                    self.save_agents(dir)
-
-
-
-        return self.state.step_counter
-
-    def step(self) -> bool:
-        """
-        Runs one step for exactly ONE agent (the next in sequence).
-
-        Returns:
-            bool: True if that agent performed work, False otherwise.
-        """
+        # lazy‑initialise
         if self.state.agent_idx is None:
             self.state.agent_idx = 0
-
         if self.state.step_counter is None:
             self.state.step_counter = 0
 
-        # Make sure we wrap around if index >= len(agents)
+        # wrap‑around
         if self.state.agent_idx >= len(self.agents):
             self.state.agent_idx = 0
 
         idx = self.state.agent_idx
         agent = self.agents[idx]
 
-        rich_console.print(f"[green]#{idx}:Running Agent {agent}, active={agent.is_active}[/green]")
-
-        # Advance agent_idx for the next call, wrapping around
+        rich_console.print(f"[green]#{idx}: running {agent}, active={agent.is_active}[/green]")
+        old_counter = self.state.step_counter
+        if self.debugger:
+            self.debugger.start_agent(agent, old_counter)
+        # prepare state for next call *before* we actually step
         self.state.agent_idx = (self.state.agent_idx + 1) % len(self.agents)
         self.state.step_counter += 1
 
-        # Skip inactive agents (always returns False if inactive)
+        # skip inactive
         if not agent.is_active:
-            rich_console.print(f"   [grey53]#{idx}:Agent {agent} is inactive[/grey53]")
-            did_run = False
-        else:
-            try:
-                # rich_console.print(f"   [blue]#{idx}:stepping Agent {agent} is active[/blue]")
-                result = agent.step()
-            except SchedulerException as e:
-                rich_console.print(
-                    f"[red]#{idx}:[ERROR] Agent {e.agent_name} #{self.state.agent_idx} failed in step {self.state.step_counter} with: {e.original_exception}[/red]"
-                )
-                if self.error_dir:
-                    self.save_agents(self.error_dir)
-                    self.save_state(self.error_dir)
-                raise
+            rich_console.print(f"   [grey53]#{idx}: {agent} is inactive[/grey53]")
+            return False
 
-            # Show the result in logs
-            if result:
-                rich_console.print(f"   [orange3]#{idx}:Agent {agent} step result finished (running)[/orange3]")
-                did_run = True
-            else:
-                # rich_console.print(f"   [grey53]#{idx}:Agent {agent} step result finished (idle)[/grey53]")
-                did_run = False
+        # run
+        try:
+            did_run = bool(agent.step())
+            if self.debugger:
+                self.debugger.finished_agent(agent, old_counter, did_run)
+        except SchedulerException as e:
+            rich_console.print(
+                f"[red]#{idx}: [ERROR] {e.agent_name} failed in step "
+                f"{self.state.step_counter} with: {e.original_exception}[/red]"
+            )
+            if self.debugger:
+                self.debugger.error_agent(agent, self.state.step_counter, e)
+            if self.error_dir:
+                self.save_scheduler(self.error_dir)
+            raise
 
-
+        if did_run:
+            rich_console.print(f"   [orange3]#{idx}: step finished (running)[/orange3]")
+        # else: silent idle
 
         return did_run
+
+    # ------------------------------------------------------------------ #
+    # 2) public “tick” -------------------------------------------------- #
+    # ------------------------------------------------------------------ #
+    def step(self) -> bool:
+        """
+        Run *one* scheduler tick (i.e. potentially one agent) **and** all
+        the associated bookkeeping.
+        Returns **True** as long as there might still be work left,
+        **False** when a full round produced only idle agents.
+        """
+        if not self.agents:
+            return False  # nothing to do
+
+        # show round‑header once per round‑robin
+        round_idx = self.state.step_counter // len(self.agents)
+        if self.state.agent_idx == 0:
+            rich_console.print(
+                f"[red]Executing scheduler step {round_idx}|{self.state.agent_idx} "
+                f"/ done={self.state.all_done_counter}/{len(self.agents)}"
+                f"  -------------------------------------[/red]"
+            )
+
+        did_run = self._step_one_agent()
+
+        # update consecutive‑idle counter
+        if did_run:
+            # Reset the idle counter on any run true
+            self.state.all_done_counter = 0
+        else:
+            self.state.all_done_counter += 1
+            if self.state.all_done_counter >= len(self.agents):
+                rich_console.print(
+                    f"[red]No active agent found scheduler step "
+                    f"{round_idx} / {self.state.all_done_counter} / {len(self.agents)}[/red]"
+                )
+                return False  # <- we are done
+
+        # auto‑save at end of a round
+        if self.state.agent_idx == 0 and self.save_dir and round_idx % self.save_step == 0:
+            path = f"{self.save_dir}/step_{round_idx}"
+            self.save_scheduler(path)
+
+        return True
+
+    # ------------------------------------------------------------------ #
+    # 3) “run‑to‑completion” wrapper ----------------------------------- #
+    # ------------------------------------------------------------------ #
+    def step_all(self) -> int:
+        """
+        Keep calling `step()` until it reports that every agent was idle
+        for a whole round.  Returns the final `step_counter`.
+        """
+        rich_console.print(
+            f"[red]Start scheduler at step {self.state.step_counter} "
+            f"agents={len(self.agents)}[/red]"
+        )
+        self.state.all_done_counter = 0  # fresh run
+
+        while self.step():
+            if self.debugger:
+                pause_cnt = 0
+                pause_state = self.debugger.is_pause(pause_cnt, self.state.step_counter)
+                while pause_state:
+                    time.sleep(0.25)
+                    pause_cnt += 1
+                    pause_state = self.debugger.is_pause(pause_cnt, self.state.step_counter)
+            pass  # everything is handled inside
+
+        return self.state.step_counter
 
     def get_final_outputs(self) -> Dict[str, List[BaseModel]]:
         """
@@ -236,7 +293,7 @@ class AgentScheduler:
 
     def load_state(self, dir:str) -> None:
         """
-        Load all agents and sschulder.
+        Load state of scheduler.
         :param dir: The dir
         """
         path = os.path.join(dir, "scheduler_state.json")
@@ -244,3 +301,19 @@ class AgentScheduler:
             data = json.load(f)
         self.state = AgentSchedulerState.model_validate(data)
 
+    def save_scheduler(self, path: str) -> None:
+        """
+        save all agents and scheduler.
+        :param dir: The dir
+        """
+        os.makedirs(path, exist_ok=True)
+        self.save_state(path)
+        self.save_agents(path)
+
+    def load_scheduler(self, path:str) -> None:
+        """
+        load all agents and scheduler.
+        :param dir: The dir
+        """
+        self.load_agents(path)
+        self.load_state(path)
