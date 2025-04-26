@@ -55,6 +55,7 @@ class PipelinePrinter:
         is_ortho: bool = False,
         direction: str = "TB",
         fillcolor: Optional[str] = None,
+        entry_exit_fillcolor: Optional[str] = None,
         *,
         show_schemas: bool = False,
         schema_fillcolor: Optional[str] = None,
@@ -88,6 +89,17 @@ class PipelinePrinter:
             self.node_fill = None
             self.node_border = None
             self.node_fontcolor = None
+        self.fillcolor = fillcolor
+
+        if entry_exit_fillcolor:
+            self.entry_exit_node_fill = (
+                entry_exit_fillcolor if entry_exit_fillcolor.startswith("light") else f"light{entry_exit_fillcolor}"
+            )
+            self.entry_exit_node_border = fillcolor
+        else:
+            self.entry_exit_node_fill =  self.node_fill
+            self.entry_exit_node_border = self.node_border
+
 
         # schema‑node settings ----------------------------------------------
         self.show_schemas = show_schemas
@@ -104,6 +116,19 @@ class PipelinePrinter:
         """Return a GraphViz *dot* string describing the pipeline."""
         edges = self._collect_edges(list(agents))
         return self._dot(edges)
+
+    def to_mermaid(self, agents: Iterable["ConnectedAgent"]) -> str:
+        """
+        Return a Mermaid-JS graph definition that mirrors `.to_dot()`.
+
+        Example
+        -------
+        >>> printer = PipelinePrinter(direction="LR", show_schemas=True)
+        >>> mmd = printer.to_mermaid(scheduler.agents)
+        >>> Path("pipeline.mmd").write_text(mmd)
+        """
+        edges = self._collect_edges(list(agents))
+        return self._mermaid(edges)
 
     def save_as_png(self, agents: Iterable["ConnectedAgent"], png_path: Union[str, Path]):
         """Render the graph directly to a PNG (requires *dot* on PATH)."""
@@ -183,6 +208,31 @@ class PipelinePrinter:
                         seen.add(port)
                         yield port
 
+    # ───────────────────────────  CLASSIFIER  ────────────────────────────
+    def _classify_nodes(self, edges):
+        """Return (entries, exits, all_nodes) from the edge mapping.
+
+        *entries* have no incoming edges; *exits* have no outgoing edges.
+        """
+        from collections import defaultdict
+
+        incoming = defaultdict(int)
+        outgoing = defaultdict(int)
+        nodes = set()
+
+        for src, targets in edges.items():
+            nodes.add(src)
+            if targets:
+                outgoing[src] += len(targets)
+            for tgt, *_ in targets:
+                nodes.add(tgt)
+                incoming[tgt] += 1
+
+        entries = {n for n in nodes if incoming[n] == 0}
+        exits   = {n for n in nodes if outgoing[n] == 0}
+        return entries, exits, nodes
+
+
     @staticmethod
     def _schema_for_port(agent: "ConnectedAgent", port_obj: "ToolPort") -> Optional[Type]:
         """Resolve the schema *associated* with a given output port."""
@@ -222,14 +272,22 @@ class PipelinePrinter:
                 print(f"  {connector} {tgt}{suffix}")
 
     def _dot(self, edges) -> str:
-        """Return a GraphViz *dot* string for the graph – honours `show_schemas`."""
+        """Return a GraphViz *dot* string for the graph – honours `show_schemas`
+        and paints entry/exit nodes with dedicated colours."""
         label_type = "xlabel" if self.is_ortho else "label"
 
-        lines: List[str] = ["digraph pipeline {", f"  rankdir={self.direction};", "  bgcolor=transparent;"]
+        # 1) figure out which nodes are entries/exits
+        entries, exits, _ = self._classify_nodes(edges)
+
+        # 2) header & global defaults
+        lines: List[str] = [
+            "digraph pipeline {",
+            f"  rankdir={self.direction};",
+            "  bgcolor=transparent;",
+        ]
         if self.is_ortho:
             lines.append("  splines=ortho;")
 
-        # node defaults ------------------------------------------------------
         if self.fillcolor:
             lines.append(
                 '  node [shape=box, style="rounded,filled", '
@@ -239,7 +297,14 @@ class PipelinePrinter:
         else:
             lines.append("  node [shape=box, style=rounded];")
 
-        # edges (and optional schema notes) ----------------------------------
+        # 3) per-node overrides for entry/exit
+        for node in entries | exits:
+            fill  = self.entry_exit_node_fill  or self.node_fill or "white"
+            bord  = self.entry_exit_node_border or self.node_border or "black"
+            # only override colours—style/shape inherit from the global defaults
+            lines.append(f'  "{node}" [fillcolor="{fill}", color="{bord}"];')
+
+        # 4) edges (and optional schema notes)
         for src, targets in edges.items():
             for tgt, suffix, out_schema, in_schema in targets:
                 if self.show_schemas:
@@ -278,56 +343,40 @@ class PipelinePrinter:
         lines.append("}")
         return "\n".join(lines)
 
-# ──────────────────────────────────────────────────────────────────────────────
-#  ADD TO PipelinePrinter (place just below _dot, or wherever you group helpers)
-# ──────────────────────────────────────────────────────────────────────────────
-
-    # ───────────────────────────  NEW: Mermaid  ────────────────────────────
-
-    def to_mermaid(self, agents: Iterable["ConnectedAgent"]) -> str:
-        """
-        Return a Mermaid-JS graph definition that mirrors `.to_dot()`.
-
-        Example
-        -------
-        >>> printer = PipelinePrinter(direction="LR", show_schemas=True)
-        >>> mmd = printer.to_mermaid(scheduler.agents)
-        >>> Path("pipeline.mmd").write_text(mmd)
-        """
-        edges = self._collect_edges(list(agents))
-        return self._mermaid(edges)
-
-    # ------------------------------------------------------------------ helpers
 
     def _mermaid(self, edges) -> str:
-        """Internal rendering routine – very similar to `_dot()`."""
-        # Graph orientation ────────────────────────────────────────────────
-        orient_map = {"TB": "TD", "BT": "BT", "LR": "LR", "RL": "RL"}
-        orientation = orient_map.get(self.direction, "TD")
+        """Internal rendering routine – paints entry/exit nodes specially in Mermaid."""
+        # 1) classify
+        entries, exits, _ = self._classify_nodes(edges)
+
+        # 2) orientation
+        orient_map   = {"TB": "TD", "BT": "BT", "LR": "LR", "RL": "RL"}
+        orientation  = orient_map.get(self.direction, "TD")
 
         def _safe(node: str) -> str:
-            """Mermaid node ids must be bare-word – replace non-word chars."""
             import re
             return re.sub(r"\W+", "_", node)
 
-        # Build text lines ─────────────────────────────────────────────────
+        # 3) build lines
         lines: List[str] = [f"graph {orientation}"]
 
         for src, targets in edges.items():
             src_id = _safe(src)
-            lines.append(f'    {src_id}["{src}"]')          # declare once
+            lines.append(f'    {src_id}["{src}"]')
+            if src in entries:
+                lines.append(f"    class {src_id} entry_exit;")
 
             for tgt, suffix, out_schema, in_schema in targets:
                 tgt_id = _safe(tgt)
-                if f'{tgt_id}["' not in " ".join(lines):     # declare once
+                if f'{tgt_id}["' not in " ".join(lines):
                     lines.append(f'    {tgt_id}["{tgt}"]')
+                    if tgt in exits:
+                        lines.append(f"    class {tgt_id} entry_exit;")
 
-                # Edge label (input-port suffix)  ────────────────────────
                 elabel = f' |{suffix[1:]}| ' if suffix else " "
 
-                # Optional schema “note” nodes  ───────────────────────────
                 if self.show_schemas:
-                    safe = suffix or "@"
+                    safe    = suffix or "@"
                     note_id = _safe(f"{src}_{tgt}_{safe}_schema")
                     if out_schema == in_schema:
                         label = out_schema.__name__ if out_schema else "?"
@@ -343,7 +392,7 @@ class PipelinePrinter:
 
         lines.append("")
 
-        # Optional styling block for schema notes (only if used) ───────────
+        # 4) schema note styling (if used)
         if self.show_schemas:
             fill = self.schema_fillcolor or "#FFE"
             lines.insert(
@@ -351,8 +400,14 @@ class PipelinePrinter:
                 f'classDef schema fill:{fill},stroke:#333,stroke-width:1px,font-size:10px;',
             )
 
+        # 5) entry/exit styling
+        fill   = self.entry_exit_node_fill  or "#EDF2FF"
+        border = self.entry_exit_node_border or "#547DDE"
+        lines.append(f'classDef entry_exit fill:{fill},stroke:{border},stroke-width:2px;')
+
         return "\n".join(lines)
 
+    # ------------------------------------------------------------------ helpers
 
     def save_as_dot(
             self,

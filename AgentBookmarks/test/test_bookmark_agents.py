@@ -297,10 +297,18 @@ def main():
 
     # ------------------------------------------------------------------------------------------------
     # Print pipeline
-    printer = PipelinePrinter(is_ortho=False, direction='TB', fillcolor='blue', show_schemas=True,schema_fillcolor='moccasin')
+    printer = PipelinePrinter(is_ortho=False,
+                              direction='TB',
+                              fillcolor='blue',
+                              entry_exit_fillcolor='pink',
+                              show_schemas=True,
+                              schema_fillcolor='moccasin')
     printer.print_ascii(scheduler.agents)
     printer.save_as_png(scheduler.agents, 'r:/pipeline_bookmarks_large.png')
-    printer = PipelinePrinter(is_ortho=False, direction='TB', fillcolor='blue')
+    printer = PipelinePrinter(is_ortho=False,
+                              direction='TB',
+                              fillcolor='blue',
+                              entry_exit_fillcolor='pink',)
     printer.print_ascii(scheduler.agents)
     printer.save_as_png(scheduler.agents, 'r:/pipeline_bookmarks.png')
     #return

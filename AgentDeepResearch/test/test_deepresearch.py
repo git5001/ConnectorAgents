@@ -147,10 +147,19 @@ def demo_run():
     scheduler, entry = build_pipeline()
     # ------------------------------------------------------------------------------------------------
     # Print pipeline
-    printer = PipelinePrinter(is_ortho=True, direction='TB', fillcolor='blue')
+    printer = PipelinePrinter(is_ortho=True,
+                              direction='TB',
+                              fillcolor='blue',
+                              entry_exit_fillcolor = 'pink',
+                                )
     printer.print_ascii(scheduler.agents)
     printer.save_as_png(scheduler.agents, 'r:/pipeline_research.png')
-    printer = PipelinePrinter(is_ortho=True, direction='TB', fillcolor='blue', show_schemas = True, schema_fillcolor = 'moccasin')
+    printer = PipelinePrinter(is_ortho=True,
+                              direction='TB',
+                              fillcolor='blue',
+                              entry_exit_fillcolor='pink',
+                              show_schemas = True,
+                              schema_fillcolor = 'moccasin')
     printer.print_ascii(scheduler.agents)
     printer.save_as_png(scheduler.agents, 'r:/pipeline_research_large.png')
     #return

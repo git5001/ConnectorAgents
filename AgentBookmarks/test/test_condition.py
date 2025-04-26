@@ -95,12 +95,21 @@ def main():
     scheduler.add_agent(sinkAgent)
     scheduler.add_agent(sinkCntAgent)
 
-    printer = PipelinePrinter(is_ortho=False, direction='LR', fillcolor='blue')
+    printer = PipelinePrinter(is_ortho=False,
+                              direction='LR',
+                              fillcolor='blue',
+                              entry_exit_fillcolor='yellow',
+                              )
     printer.print_ascii(scheduler.agents)
     printer.to_dot(scheduler.agents,)
     printer.save_as_png(scheduler.agents, 'r:/pipeline_condition.png')
 
-    printer = PipelinePrinter(is_ortho=False, direction='LR', fillcolor='blue', show_schemas=True,schema_fillcolor='moccasin')
+    printer = PipelinePrinter(is_ortho=False,
+                              direction='LR',
+                              fillcolor='blue',
+                              entry_exit_fillcolor='yellow',
+                              show_schemas=True,
+                              schema_fillcolor='moccasin')
     printer.print_ascii(scheduler.agents)
     printer.to_dot(scheduler.agents,)
     printer.save_as_png(scheduler.agents, 'r:/pipeline_condition_large.png')
