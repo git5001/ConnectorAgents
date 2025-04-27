@@ -16,7 +16,9 @@ class EnhancedQueryOutput(BaseIOSchema):
     Alias: enhancer
     """
     original: str = Field(..., description="User original research question")
-    search:str = Field(..., description="User research question for web search")
+    search_1:str = Field(..., description="User research question for web search #1")
+    search_2:str = Field(..., description="User research question for web search #2")
+    search_3:str = Field(..., description="User research question for web search #3")
     enhanced: str = Field(..., description="User research question enhanced for resarch report generation")
 
 

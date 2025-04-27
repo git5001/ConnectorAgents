@@ -13,7 +13,9 @@ from .schemas import UserQueryInput, EnhancedQueryOutput, DebugModel
 # 1.  A tiny pydantic model just for the LLM’s JSON response
 # ------------------------------------------------------------
 class LLMEnhanceOutput(BaseModel):
-    search: str
+    search_1: str
+    search_2: str
+    search_3: str
     enhanced: str
 
 
@@ -50,16 +52,23 @@ class QueryEnhancerAgent(ConnectedAgent):
             dummy_enhanced = f"Enhanced search query based on intent and context of: '{params.query}'"
             return EnhancedQueryOutput(
                 original=params.query,
-                search=dummy_search,
+                search_1=dummy_search,
+                search_2=dummy_search,
+                search_3=dummy_search,
                 enhanced=dummy_enhanced,
             )
 
         llm_result: LLMEnhanceOutput = self._run_llm(params.query)
         print(f"[Enhancer] Enhanced query is: {llm_result.enhanced}")
+        print(f"[Enhancer] Seqarch #1 is: {llm_result.search_1}")
+        print(f"[Enhancer] Seqarch #2 is: {llm_result.search_2}")
+        print(f"[Enhancer] Seqarch #3 is: {llm_result.search_3}")
 
         return EnhancedQueryOutput(
             original=params.query,
-            search=llm_result.search,
+            search_1=llm_result.search_1,
+            search_2=llm_result.search_2,
+            search_3=llm_result.search_3,
             enhanced=llm_result.enhanced,
         )
 
@@ -74,14 +83,18 @@ You are an expert research assistant.
 
 **Task**  
 You will receive a raw user question.  
-Produce two improved versions:
 
-1. **search** – a concise query string optimised for a modern web search
+Produce distinct output types which improve the user prompt into two different directions:
+
+1. **search** – Produce three concise query string optimised for a modern web search (search_1, search_2, search_3)
+   - You produce three different web search terms which analyse the problem from three different angles.
+     The searches should be as disjunct as possible to retrieve a large search space (e.g. physical, psychological, historical aspects)
    - Strip filler words, keep core keywords, add essential qualifiers.  
    - ≤ 15 words, lower-case, no punctuation except quotes or operators that improve search.
-   - The search term is the query to a web search engine about this topic and must find all relevant and diverse pages
+   - The search terms are the query to a web search engine about this topic and must find all relevant and diverse pages
+   
 
-2. **enhanced** – a well-formed research question suitable for defining and  designing an academic report.
+2. **enhanced** – a well-formed research question suitable for defining and  designing an academic report (enhanced).
    - Rewrite in formal English, clarify scope, add any obviously missing variables
      (e.g., time-frame, population, metric) inferred from context.
    - Cover side and slightly related topics to generate a fully runded research  
@@ -102,7 +115,9 @@ Produce two improved versions:
 ---
 ### Strict JSON schema
 {{
-  "search": str,
+  "search_1": str,
+  "search_2": str,
+  "search_3": str,
   "enhanced": str
 }}
 Begin JSON now:
@@ -119,7 +134,7 @@ Begin JSON now:
         except Exception as e:
             logger.error(f"{self.__class__.__name__} failed with {e}")
             # fall back to pass-through so downstream agents still work
-            result_obj = LLMEnhanceOutput(search=user_query, enhanced=user_query)
+            result_obj = LLMEnhanceOutput(search_1=user_query, search_2="", search_3="", enhanced=user_query)
 
         # optional: keep a debugging artefact, mirroring your existing pattern
         debug_data = DebugModel(

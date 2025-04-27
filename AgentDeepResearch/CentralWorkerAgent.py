@@ -23,13 +23,17 @@ class CentralWorkerState(BaseModel):
     The local state of the worker.
     """
     original: str = Field(..., description="User original research question")
-    search: str = Field(..., description="User research question for web search")
+    search_1: str = Field(..., description="User research question for web search")
+    search_2: str = Field(..., description="User research question for web search")
+    search_3: str = Field(..., description="User research question for web search")
     enhanced: str = Field(..., description="User research question enhanced for research report generation")
     @staticmethod
     def empty() -> "CentralWorkerState":
         return CentralWorkerState(
             original="",
-            search="",
+            search_1="",
+            search_2="",
+            search_3="",
             enhanced=""
         )
 
@@ -59,16 +63,20 @@ class CentralWorkerAgent(MultiPortAgent):
         if EnhancedQueryOutput in inputs:
             eq: EnhancedQueryOutput = inputs[EnhancedQueryOutput]
             self.iterations += 1
-            print(f"[Worker] Planning searches for '{eq.search}'")
+            print(f"[Worker] Planning searches for #1: '{eq.search_1}'")
+            print(f"[Worker] Planning searches for #2: '{eq.search_2}'")
+            print(f"[Worker] Planning searches for #3: '{eq.search_3}'")
             # Store state
             self._state.original = eq.original
-            self._state.search = eq.search
+            self._state.search_1 = eq.search_1
+            self._state.search_2 = eq.search_2
+            self._state.search_3 = eq.search_3
             self._state.enhanced = eq.enhanced
 
-            tavily_input = TavilySearchToolInputSchema(
-                 queries = [eq.search]
-            )
-            return tavily_input
+            tavily_input_1 = TavilySearchToolInputSchema(queries = [eq.search_1])
+            tavily_input_2 = TavilySearchToolInputSchema(queries = [eq.search_2])
+            tavily_input_3 = TavilySearchToolInputSchema(queries = [eq.search_3])
+            return [tavily_input_1, tavily_input_2, tavily_input_3]
         # Second input path – the web search shall be summarized as page summary
         if TavilySearchToolOutputSchema in inputs:
             ts: TavilySearchToolOutputSchema = inputs[TavilySearchToolOutputSchema]
@@ -92,7 +100,11 @@ class CentralWorkerAgent(MultiPortAgent):
             print(f"[Worker] Received summary results {len(lm.data)} for '{self._state.original}'")
 
             self.iterations += 1
-            input = EnhancedQueryOutput(original=self._state.original, search=self._state.search, enhanced=self._state.enhanced)
+            input = EnhancedQueryOutput(original=self._state.original,
+                                        search_1=self._state.search_1,
+                                        search_2=self._state.search_2,
+                                        search_3=self._state.search_3,
+                                        enhanced=self._state.enhanced)
             out = SynthezierInputModel(data=lm.data, input=input)
 
             return out

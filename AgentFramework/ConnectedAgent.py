@@ -69,6 +69,9 @@ class ConnectedAgent(BaseTool):
                     self._output_ports[output_schema]: ToolPort = ToolPort(ToolPort.Direction.OUTPUT, output_schema,f"{uuid}:{self.__class__.__name__}#{port_cnt}")
                     port_cnt += 1
 
+    @property
+    def config(self):
+        return self._config
 
     @property
     def global_state(self) -> BaseModel:

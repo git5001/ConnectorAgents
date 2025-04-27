@@ -16,9 +16,18 @@ class LLMSummaryOutput(BaseModel):
     research: str = Field(..., description="Research extract of the content.")
     relevance:int = Field(..., description="Relevance of the content 0..100 for the reseach question.")
 
+class PageSummarizerAgentState(BaseModel):
+    """Page counter"""
+
+    count: int = Field(..., description="Page counter for debug only")
+
+
 class PageSummarizerAgent(ConnectedAgent):
     input_schema = PageSummaryItemSchema
     output_schema = PageSummary
+    # --- State -----------------------------------------------------------
+    state_schema = PageSummarizerAgentState
+    _state: PageSummarizerAgentState
 
     def __init__(self, config: LLMAgentConfig, uuid:str = 'default') -> None:
         """
@@ -28,13 +37,15 @@ class PageSummarizerAgent(ConnectedAgent):
             config (LLMAgentConfig, optional): Configuration for the agent. Defaults to LLMAgentConfig().
         """
         super().__init__(config, uuid)
+        self._state = PageSummarizerAgentState(count=0)
 
         self.model: LLMModel = LLMModel(config, self.__class__.__name__)
         self.model.delete_log_files()
 
     def run(self, params: PageSummaryItemSchema) -> PageSummary:
         query = params.research_query
-        print(f"[Summarizer] Summarizing {params.url} for {query}")
+        print(f"[Summarizer] Summarizing #{self._state.count}: {params.url} for {query}")
+        self._state.count += 1
         if DUMMY_LLM:
             dummy_research = (
                 f"Based on analysis of the page titled '{params.title}', "
