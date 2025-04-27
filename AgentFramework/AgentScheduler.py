@@ -33,12 +33,16 @@ class AgentScheduler:
         error_dir: Store agents there if we had an error or None
         save_step: After how many steps shall we save
     """
+    # Static by init
     debugger: "DebugInterface"
     agents: List["ConnectedAgent"]
     save_dir: str
     error_dir: str
     save_step: int
+
+    # Dynamic
     state: AgentSchedulerState
+    _global_state: BaseModel
 
     def __init__(self,
                  save_dir:str = None,
@@ -280,26 +284,60 @@ class AgentScheduler:
             rich_console.print(f"[blue]Loaded agent {agent.__class__.__name__}[/blue] from {filepath}")
         rich_console.print(f"[blue]Loaded {len(self.agents)} agents from '{directory}'.[/blue]")
 
-
-
-    def save_state(self, dir:str) -> None:
+    def save_state(self, dir: str) -> None:
         """
-        Save all agents and scheulder to dir.
-        :param dir:  save dir
+        Save scheduler + global state into <dir>/scheduler_state.json
         """
         path = os.path.join(dir, "scheduler_state.json")
-        with open(path, "w") as f:
-            json.dump(self.state.model_dump(), f, indent=2)
 
-    def load_state(self, dir:str) -> None:
+        # Anything that’s a pydantic model serialises cleanly via .model_dump()
+        payload = {
+            "scheduler_state": self.state.model_dump(),
+            "global_state": (
+                self._global_state.model_dump()
+                if isinstance(self._global_state, BaseModel)
+                else self._global_state  # could be None or a plain dict
+            ),
+            # Optional but handy – lets you restore into the right class later
+            "global_state_cls": (
+                f"{self._global_state.__class__.__module__}."
+                f"{self._global_state.__class__.__qualname__}"
+                if self._global_state is not None else None
+            ),
+        }
+
+        with open(path, "w") as f:
+            json.dump(payload, f, indent=2)
+
+    def load_state(self, dir: str) -> None:
         """
-        Load state of scheduler.
-        :param dir: The dir
+        Load scheduler + global state from <dir>/scheduler_state.json
         """
         path = os.path.join(dir, "scheduler_state.json")
         with open(path, "r") as f:
-            data = json.load(f)
-        self.state = AgentSchedulerState.model_validate(data)
+            payload = json.load(f)
+
+        # Scheduler core
+        self.state = AgentSchedulerState.model_validate(payload["scheduler_state"])
+
+        # Global state – three common cases
+        gs_data = payload.get("global_state")
+        if gs_data is None:
+            self._global_state = None
+
+        elif payload.get("global_state_cls"):
+            # Rebuild the exact model class it was saved from
+            module_name, _, cls_name = payload["global_state_cls"].rpartition(".")
+            module = __import__(module_name, fromlist=[cls_name])
+            cls = getattr(module, cls_name)
+            if issubclass(cls, BaseModel):
+                self._global_state = cls.model_validate(gs_data)
+            else:
+                # Fallback – just leave it as the raw dict
+                self._global_state = gs_data
+        else:
+            # It was a plain dict (or something already JSON-serialisable)
+            self._global_state = gs_data
 
     def save_scheduler(self, path: str) -> None:
         """

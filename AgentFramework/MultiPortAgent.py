@@ -16,7 +16,7 @@ class MultiPortAgent(ConnectedAgent):
     """
 
     # ----- class-level contracts --------------------------------------------
-    input_schemas: Dict[str, Type[BaseModel]] = {}          # <name> -> schema
+    input_schemas: List[Type[BaseModel]] = []
     output_schema: Optional[Type[BaseModel]] = None
     output_schemas: Optional[List[Type[BaseModel]]] = None
 
@@ -36,10 +36,10 @@ class MultiPortAgent(ConnectedAgent):
             raise TypeError("Define `output_schema` or `output_schemas`.")
 
         # ---- INPUT ports -----------------------------------------------------
-        self._input_ports: Dict[str, ToolPort] = {
-            name: ToolPort(ToolPort.Direction.INPUT, schema,
+        self._input_ports: Dict[Type[BaseModel], ToolPort] = {
+            schema: ToolPort(ToolPort.Direction.INPUT, schema,
                            f"{uuid}:{self.__class__.__name__}")
-            for name, schema in self.input_schemas.items()
+            for schema in self.input_schemas
         }
 
         # ---- OUTPUT port(s) ---------------------------------------------------
@@ -70,16 +70,19 @@ class MultiPortAgent(ConnectedAgent):
         raise AttributeError("Setting single .input_port is not allowed.")
 
     # ------------------------------------------------------------------------
-    def _find_input_port(self, source_port_name:str = None):
+    def _find_input_port(self, source_port_schema:Type[BaseModel] = None):
 
         """
         Finds a port with a given name or the default port if no name
-        :param source_port_name: Name of port or none
+        :param source_port_schema: Schema of port or none
         :return: The port
         """
-        if not source_port_name:
+        if not source_port_schema:
             raise NotImplementedError("Multi port must provide source port.")
-        return self._input_ports[source_port_name]
+        if not source_port_schema in self._input_ports:
+            raise ValueError(f"Input port {source_port_schema} is not defined in {self.__class__.__name__}.")
+        found = self._input_ports[source_port_schema]
+        return found
     # ------------------------------------------------------------------------
     def step(self) -> bool:
         """
@@ -87,17 +90,17 @@ class MultiPortAgent(ConnectedAgent):
         forwards it to `self.process`, and handles rollback on error.
         """
 
-        port_names = list(self._input_ports.keys())
-        if not port_names:
+        port_schemas = list(self._input_ports.keys())
+        if not port_schemas:
             return False
 
-        n_ports = len(port_names)
+        n_ports = len(port_schemas)
 
         # --- find the next queue that has data -------------------------------
         for i in range(n_ports):
             probe_idx = (self._rr_idx + 1 + i) % n_ports
-            port_name = port_names[probe_idx]
-            probe_port = self._input_ports[port_name]
+            port_schema = port_schemas[probe_idx]
+            probe_port = self._input_ports[port_schema]
             if probe_port.queue:
                 self._rr_idx = probe_idx
                 break
@@ -113,7 +116,7 @@ class MultiPortAgent(ConnectedAgent):
         try:
             if self.debugger:
                 self.debugger.input(self, input_msg, parents)
-            input_map ={port_name:input_msg}
+            input_map ={port_schema:input_msg}
             output_msg = self.process(input_map, parents)
             if self.debugger:
                 self.debugger.output(self, output_msg, parents)
@@ -127,17 +130,27 @@ class MultiPortAgent(ConnectedAgent):
 
     # ------------------------------------------------------------------------
     def _gather_ports(self) -> Dict[str, ToolPort]:
-        """Expose ports for checkpoint/debug (same layout as aggregator)."""
-        ports = {f"input_{n}": p for n, p in self._input_ports.items()}
+        """
+        Expose ports for checkpoint / debug.
+
+        Keys must stay identical across save- and load-cycles,
+        so we index inputs numerically in list order.
+        """
+        ports: Dict[str, ToolPort] = {
+            f"input_{idx}": self._input_ports[schema]
+            for idx, schema in enumerate(self.input_schemas)
+        }
+
         for schema, port in self._output_ports.items():
             ports[f"output_ports:{schema.__name__}"] = port
+
         if getattr(self, "_output_port", None):
             ports["output_port"] = self._output_port
+
         return ports
 
     # ------------------------------------------------------------------------
     def load_state(self, state_dict: dict):
-        """Restore internal + port state (copied from aggregator logic)."""
         if state_dict.get("state") and self.state_schema:
             self._state = self.state_schema(**state_dict["state"])
 
@@ -145,9 +158,9 @@ class MultiPortAgent(ConnectedAgent):
             pstate = state_dict.get("ports", {}).get(pname, {})
 
             if pname.startswith("input_"):
-                in_name = pname.replace("input_", "")
-                schema = self.input_schemas[in_name]
-            else:  # output(s)
+                idx = int(pname[len("input_"):])
+                schema = self.input_schemas[idx]
+            else:  # outputs stay exactly as before
                 if self.output_schema:
                     schema = self.output_schema
                 else:
@@ -157,3 +170,4 @@ class MultiPortAgent(ConnectedAgent):
                     )
 
             self._load_port(pobj, pstate, schema)
+

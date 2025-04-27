@@ -26,11 +26,11 @@ class NewsMultiPortAggregatorAgent(MultiPortAggregatorAgent):
         input_schemas (Dict[str, Type[BaseModel]]): Specifies expected input schemas.
         output_schema (Type[BaseModel]): Defines the expected output schema.
     """
-    input_schemas = {
-        "search_result": TavilySearchToolOutputSchema,
-        "web_scraping_result": WebpageScraperToolOutputSchema,
-        "llm_result": LLMNewsOutput
-    }
+    input_schemas = [
+        TavilySearchToolOutputSchema,
+        WebpageScraperToolOutputSchema,
+        LLMNewsOutput
+    ]
     output_schema = MergedOutput
 
     def run(self, inputs: Dict[str, Tuple[str, BaseModel]]) -> BaseModel:
@@ -43,9 +43,9 @@ class NewsMultiPortAggregatorAgent(MultiPortAggregatorAgent):
         Returns:
             MergedOutput: A structured output containing aggregated information.
         """
-        search_result: TavilySearchToolOutputSchema = inputs["search_result"]
-        web_scraping_result: WebpageScraperToolOutputSchema = inputs["web_scraping_result"]
-        llm_result: LLMNewsOutput = inputs["llm_result"]
+        search_result: TavilySearchToolOutputSchema = inputs[TavilySearchToolOutputSchema]
+        web_scraping_result: WebpageScraperToolOutputSchema = inputs[WebpageScraperToolOutputSchema]
+        llm_result: LLMNewsOutput = inputs[LLMNewsOutput]
 
         url = search_result.url
         title = search_result.title

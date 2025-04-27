@@ -17,7 +17,7 @@ from AgentNews.NewsToTextAgent import NewsToTextAgent, NewsToTextAgentConfig
 from AgentNews.TextListCollectionAgent import TextListCollectionAgentConfig, TextListCollectionAgent
 from AgentNews.LLMNewsAgent import LLMNewsAgent, LLMNewsAgentConfig
 from AgentNews.NewsMultiPortAggregatorAgent import NewsMultiPortAggregatorAgent, NewsMultiPortAggregatorAgentConfig
-from AgentNews.NewsSchema import  LLMNewsInput, SummaryOutput
+from AgentNews.NewsSchema import LLMNewsInput, SummaryOutput, LLMNewsOutput
 from AgentFramework.PrintAgent import PrintAgentConfig, PrintAgent, PrintMessageInput
 from AgentNews.TaviliyAgent import TavilyAgent
 from AgentNews.WebScraperAgent import WebScraperAgent
@@ -142,9 +142,9 @@ def main():
 
     webScraper.connectTo(llmAgent, transform_webscraper_to_llm)
 
-    tavilyAgent.connectTo(mergingAgent,  transform_tavily_to_merger, target_port_name="search_result")
-    webScraper.connectTo(mergingAgent, target_port_name="web_scraping_result")
-    llmAgent.connectTo(mergingAgent, target_port_name="llm_result")
+    tavilyAgent.connectTo(mergingAgent, transform_tavily_to_merger, target_input_schema=TavilySearchToolOutputSchema)
+    webScraper.connectTo(mergingAgent, target_input_schema=WebpageScraperToolOutputSchema)
+    llmAgent.connectTo(mergingAgent, target_input_schema=LLMNewsOutput)
 
     mergingAgent.connectTo(textMakerAgent1)
     mergingAgent.connectTo(textMakerAgent2)

@@ -66,6 +66,10 @@ which is important to the research must be kept in a a bit more condensed form.
 So ultimate goal: Collect research information for a later research study. 
 
 The answer shall be detailed and exhaustive.
+The answer will serve as input in a research report, so you must
+be comprehensive and detailled. In particular you must maintain all 
+technical or scientific detail. Everything which is important for
+the report you must store. In doubt store more than less.
 
 ---
 ### Research Question:
@@ -75,10 +79,10 @@ The answer shall be detailed and exhaustive.
 Your mission:
 1. Locate every passage in the Raw Text that answers or illuminates the Research Question. 
    Extract those passages and explain them in full detail 
-   (include brief quotes or precise paraphrases).
+   (include also brief quotes or precise paraphrases).
 2. The goal is a research paper, so you must maintain and keep all technical details, all
    procedural details, all techical highlights, etc    
-3. Identify passages that provide broader context but don’t directly answer the question—condense 
+3. Identify also passages that provide broader context but don’t directly answer the question—condense 
   each of these into a summary to preserve context.
 4. Remove any passages that are unrelated (e.g., advertisements, navigation menus, user comments).
 

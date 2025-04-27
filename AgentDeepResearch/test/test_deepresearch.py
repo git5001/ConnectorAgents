@@ -11,7 +11,7 @@ from AgentDeepResearch.QueryEnhancerAgent import QueryEnhancerAgent
 from AgentDeepResearch.SearchAgent import SearchAgent
 from AgentDeepResearch.SynthesisAgent import SynthesisAgent
 from AgentDeepResearch.schemas import UserQueryInput, TavilySearchListModel, SynthezierInputModel, \
-    SynthesisOutput, PageSummaryItemSchema
+    SynthesisOutput, PageSummaryItemSchema, EnhancedQueryOutput
 from AgentFramework.AgentScheduler import AgentScheduler
 from AgentFramework.ListCollectionAgent import ListCollectionAgent, ListModel
 from AgentFramework.PiplinePrinter import PipelinePrinter
@@ -19,7 +19,7 @@ from AgentFramework.PrintAgent import PrintAgent, PrintAgentConfig, PrintMessage
 from AgentFramework.SaveJsonAgent import SaveJsonAgent, SaveJsonAgentConfig
 from AgentFramework.TCPDebugger import TCPDebugger
 from AtomicTools.tavily_search.tool.tavily_search import TavilySearchToolConfig, TavilySearchToolInputSchema, \
-    TavilySearchResultItemSchema
+    TavilySearchResultItemSchema, TavilySearchToolOutputSchema
 from util.LLMSupport import LLMAgentConfig, Provider
 
 BASE_DIR = "t:/tmp/agents_deep/"
@@ -37,7 +37,9 @@ USER_QUERY = "Capabilities and Risks of self-aware AI systems"
 USER_QUERY = "Life on exo planets - knowledge and speculation"
 USER_QUERY = "A report about the speed of all fast birds (maximum speed and usual travel speeds)"
 USER_QUERY = "Explain the details of an electic car propulsion with focus on embedded DCDC boost converter, inverters etc"
-REPORTFILENAME = f"{OUTPUT_DIR}/dcdc.md"
+USER_QUERY = "Make a extensive overview about the battleships of world war two of both axis and allies"
+
+REPORTFILENAME = f"{OUTPUT_DIR}/bb.md"
 WEB_RESULTS = 20
 
 
@@ -110,13 +112,13 @@ def build_pipeline():
 
 
     # Wire
-    enhancer.connectTo(worker, target_port_name="enhancer")
-    worker.connectTo(searcher,output_schema=TavilySearchToolInputSchema)
-    searcher.connectTo(worker, target_port_name="searcher")
-    worker.connectTo(page_summarizer,output_schema=PageSummaryItemSchema)
+    enhancer.connectTo(worker, target_input_schema=EnhancedQueryOutput)
+    worker.connectTo(searcher, source_output_schema=TavilySearchToolInputSchema)
+    searcher.connectTo(worker, target_input_schema=TavilySearchToolOutputSchema)
+    worker.connectTo(page_summarizer, source_output_schema=PageSummaryItemSchema)
     page_summarizer.connectTo(page_summarizer_sink)
-    page_summarizer_sink.connectTo(worker, target_port_name="summarizer", transformer=transform_listmodel_2_tavily_listmodel)
-    worker.connectTo(synthesizer, output_schema=SynthezierInputModel)
+    page_summarizer_sink.connectTo(worker, target_input_schema=TavilySearchListModel, transformer=transform_listmodel_2_tavily_listmodel)
+    worker.connectTo(synthesizer, source_output_schema=SynthezierInputModel)
     synthesizer.connectTo(printer, transformer=transform_report_2_print)
 
     # Debugger

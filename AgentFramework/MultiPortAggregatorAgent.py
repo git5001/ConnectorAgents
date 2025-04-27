@@ -1,309 +1,206 @@
-from typing import Type, List, Dict, Optional, Callable, Union, Tuple
+from typing import Type, List, Dict, Optional, Tuple
 from pydantic import BaseModel
-from rich.console import Console
 from atomic_agents.lib.base.base_io_schema import BaseIOSchema
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 
 from AgentFramework.ConnectedAgent import ConnectedAgent
 from AgentFramework.ToolPort import ToolPort
-from AgentFramework.listutil import compare_lists, longest_common_sublist
-from agent_logging import rich_console
+from AgentFramework.listutil import longest_common_sublist
 from util.SchedulerException import SchedulerException
 import re
 
+
 class MultiPortAggregatorAgent(ConnectedAgent):
     """
-    An agent that receives inputs from multiple ports and combines related messages into a single output.
-    Identifies messages from the same parent (based on UUIDs) or same run index and processes them together.
-    It is a bit heuristic to gather the correct inputs together. Especially if they stem from different parents.
+    Aggregates messages coming in on multiple independent input ports.
 
-    Attributes:
-        input_schemas (Dict[str, Type[BaseModel]]): Defines multiple input schemas.
-        output_schema (Type[BaseModel]): Defines the expected output schema.
-        output_schemas (Type[BaseModel]): Defines the expected output schemas.
-        _input_ports (Dict[str, ToolPort]): Manages multiple input ports.
-        output_port (ToolPort): Handles outgoing processed messages.
+    Key design alignment with `MultiPortAgent` (April 2025 revision):
+      • `input_schemas` is now a **list** of schemas; the schema object itself
+        identifies a port, so we no longer need arbitrary string names.
+      • `_input_ports` is keyed by schema, matching the new model.
+      • Checkpoint keys for input ports are numerical (input_0, input_1, …)
+        to remain stable across refactors.
     """
-    input_schemas: Dict[str, Type[BaseModel]] = {}
-    output_schema: Type[BaseModel] = None
-    output_schemas: List[Type[BaseModel]] = None
-    input_schema: BaseModel = BaseIOSchema
 
-    def __init__(self, config: BaseToolConfig = BaseToolConfig(), uuid:str = 'default') -> None:
-        """
-        Initializes the MultiPortAggregatorAgent.
+    # ------------------------------------------------------------------
+    input_schemas: List[Type[BaseModel]] = []
+    output_schema: Optional[Type[BaseModel]] = None
+    output_schemas: Optional[List[Type[BaseModel]]] = None
 
-        Args:
-            config (BaseToolConfig): Configuration settings for the agent.
+    # single‑port compatibility (unused directly)
+    input_schema: Type[BaseModel] = BaseIOSchema
 
-        Raises:
-            TypeError: If input_schemas or output_schema are not defined.
-        """
+    # ------------------------------------------------------------------
+    def __init__(self, config: BaseToolConfig = BaseToolConfig(), uuid: str = "default") -> None:
         super().__init__(config, uuid=uuid, create_ports=False)
 
+        if not self.input_schemas:
+            raise TypeError("MultiPortAggregatorAgent requires `input_schemas`.")
+        if self.output_schema is None and not self.output_schemas:
+            raise TypeError("Define `output_schema` or `output_schemas`.")
 
-
-        if not self.input_schemas or not self.output_schema:
-            raise TypeError("CollectorAgent must define `input_schemas` and `output_schema`.")
-
-        # Create input ports dynamically based on `input_schemas`
-        self._input_ports: Dict[str, ToolPort] = {
-            name: ToolPort(ToolPort.Direction.INPUT, schema, f"{uuid}:{self.__class__.__name__}")
-            for name, schema in self.input_schemas.items()
+        # ---- INPUT ports -------------------------------------------------
+        self._input_ports: Dict[Type[BaseModel], ToolPort] = {
+            schema: ToolPort(ToolPort.Direction.INPUT, schema, f"{uuid}:{self.__class__.__name__}")
+            for schema in self.input_schemas
         }
-        self._output_ports = {}
 
-        if self.output_schema is not None:
-            self._output_ports[self.output_schema]: ToolPort = ToolPort(ToolPort.Direction.OUTPUT, self.output_schema,
-                                                                        f"{uuid}:{self.__class__.__name__}")
+        # ---- OUTPUT port(s) ----------------------------------------------
+        self._output_ports: Dict[Type[BaseModel], ToolPort] = {}
+        if self.output_schema:
+            self._output_ports[self.output_schema] = ToolPort(
+                ToolPort.Direction.OUTPUT,
+                self.output_schema,
+                f"{uuid}:{self.__class__.__name__}",
+            )
         else:
-            port_cnt = 0
-            for output_schema in self.output_schemas:
-                self._output_ports[output_schema]: ToolPort = ToolPort(ToolPort.Direction.OUTPUT, output_schema,
-                                                                       f"{uuid}:{self.__class__.__name__}#{port_cnt}")
-                port_cnt += 1
+            for n, schema in enumerate(self.output_schemas):
+                self._output_ports[schema] = ToolPort(
+                    ToolPort.Direction.OUTPUT,
+                    schema,
+                    f"{uuid}:{self.__class__.__name__}#{n}",
+                )
 
+    # ------------------------------------------------------------------
     @property
-    def input_port(self):
-        raise AttributeError("Use 'input_ports' (plural) instead of 'input_port' in multi agents")
+    def input_port(self):  # type: ignore[override]
+        raise AttributeError("Use multiple input ports (`_input_ports`).")
 
-    @input_port.setter
-    def input_port(self, value):
-        raise AttributeError("Setting 'input_port' in multi agents is not allowed. Use 'input_ports' instead.")
+    @input_port.setter  # type: ignore[override]
+    def input_port(self, _):
+        raise AttributeError("Setting single .input_port is not allowed.")
 
-    def queque_size(self):
-        return ", ".join(str(len(port.queue)) for name, port in self._input_ports.items())
+    # ------------------------------------------------------------------
+    def queue_size(self) -> str:
+        """Return comma‑separated queue sizes for debug / monitoring."""
+        return ", ".join(str(len(p.queue)) for p in self._input_ports.values())
 
-
-    def _find_input_port(self, source_port_name:str = None):
-
-        """
-        Finds a port with a given name or the default port if no name
-        :param source_port_name: Name of port or none
-        :return: The port
-        """
-        if not source_port_name:
+    # ------------------------------------------------------------------
+    def _find_input_port(self, source_port_schema: Type[BaseModel] = None):
+        if source_port_schema is None:
             raise NotImplementedError("Multi port must provide source port.")
-        return self._input_ports[source_port_name]
+        if source_port_schema not in self._input_ports:
+            raise ValueError(f"Input port {source_port_schema} is not defined in {self.__class__.__name__}.")
+        return self._input_ports[source_port_schema]
 
+    # ------------------------------------------------------------------
     @staticmethod
-    def extract_parents_with_suffix(parents: str) -> Dict[str,Tuple[str]]:
-        """
-        Extract UUIDs from a list of strings like UUID:idx1:idx2,
-        where idx2 > 1. Return a dict mapping UUID -> "idx1:idx2".
-        """
-        result = {}
+    def extract_parents_with_suffix(parents: List[str]) -> Dict[str, Tuple[str, str, str]]:
+        """Extract UUID, idx1, idx2 for strings of form UUID:idx1:idx2 (idx2 > 1)."""
         pattern = re.compile(r"^(.*):(\d+):(\d+)$")
-
+        result: Dict[str, Tuple[str, str, str]] = {}
         for p in parents:
-            match = pattern.match(p)
-            if match:
-                uuid, idx1, idx2 = match.groups()
+            m = pattern.match(p)
+            if m:
+                uuid, idx1, idx2 = m.groups()
                 if int(idx2) > 1:
-                    result[p] = (uuid,idx1,idx2)
-
+                    result[p] = (uuid, idx1, idx2)
         return result
 
-    # DEPRECATED
-    def _find_parent_indices_1(self):
-        parent_indices = None
-        # Loop all elements of the first port queque
-        first_port_name = next(iter(self._input_ports))
-        for anchor_index, (anchor_parents, _) in enumerate(self._input_ports[first_port_name].queue):
-            # Get all multi items like xxx:1:127, returns parent:(uuid,idx,len) with parent = uuid:idx:lex
-            chain_parents: Dict[str, Tuple[str]] = MultiPortAggregatorAgent.extract_parents_with_suffix(anchor_parents)
+    # ------------------------------------------------------------------
+    def _find_parent_indices_2(self) -> List[int]:
+        """Align queues so that matching chain‑length messages can be processed."""
+        if not isinstance(self.input_schemas, list):
+            raise ValueError(
+                f"Expected input_schemas to be a list, got {type(self.input_schemas).__name__} in {self.__class__.__name__}"
+            )
+        first_port_schema = self.input_schemas[0]
+        first_port = self._input_ports[first_port_schema]
 
-            parent_indices = []
-            # Loop all other ports and try to find matching indices
-            for port_name in self._input_ports:
-                if port_name == first_port_name:
-                    parent_indices.append(anchor_index)
-                    continue
-                parent_idx = None
-                # Loop the whole queque of the  search port
-                for idx, (parents, models) in enumerate(self._input_ports[port_name].queue):
-                    matching_parents = 0
-                    # Loop all uuids of the anchor
-                    for chain_parent, chain_parent_tuple in chain_parents.items():
-                        chain_uuid, chain_idx, chain_len = chain_parent_tuple
-                        search = f":{chain_len}"
-                        # Check if any parent of the seach ends with the search len - we just match the same length
-                        # if we match uuid as well then we can never combine queques of different parents. Here we match
-                        # same sized elements
-                        for parent in parents:
-                            if parent.endswith(search):
-                                matching_parents += 1
-                    # Ideally we have only one collection item in anchor and search queque but it could be more
-                    if matching_parents == len(chain_parents):
-                        parent_idx = idx
-                        break
-                # We store which index we found in teh current queque, we take the first matching one
-                if parent_idx is not None:
-                    parent_indices.append(parent_idx)
-            if len(parent_indices) == len(self._input_ports):
-                break
-        return parent_indices
+        for anchor_idx, (anchor_parents, _) in enumerate(first_port.queue):
+            chain_parents = self.extract_parents_with_suffix(anchor_parents)
+            search_keys = {f":{idx1}:{idx2}" for _, (_, idx1, idx2) in chain_parents.items()}
 
-    def _find_parent_indices_2(self):
-        parent_indices = None
+            candidate_indices: List[int] = []
 
-        first_port_name = next(iter(self._input_ports))
-        first_port = self._input_ports[first_port_name]
-
-        # Iterate over candidates in the first port's queue.
-        for anchor_index, (anchor_parents, _) in enumerate(first_port.queue):
-            # Extract the chain parents from the anchor and precompute search keys.
-            chain_parents = MultiPortAggregatorAgent.extract_parents_with_suffix(anchor_parents)
-            search_keys = {f":{chain_idx}:{chain_len}" for _, (_, chain_idx, chain_len) in chain_parents.items()}
-
-            parent_indices = []
-
-            # Loop through each port to find a matching candidate.
-            for port_name, port in self._input_ports.items():
-                # For the first port, simply use the current anchor index.
-                if port_name == first_port_name:
-                    parent_indices.append(anchor_index)
+            for port_schema, port in self._input_ports.items():
+                if port_schema == first_port_schema:
+                    candidate_indices.append(anchor_idx)
                     continue
 
-                found_idx = None
-                # Iterate through the current port's queue.
-                for idx, (parents, models) in enumerate(port.queue):
-                    # Precompute the set of suffixes from each parent in the candidate.
-                    # candidate_suffixes = {parent[parent.rfind(":"):] for parent in parents if ":" in parent}
-                    candidate_suffixes = {
-                        ":" + ":".join(parent.split(":")[1:])
-                        for parent in parents if parent.count(":") >= 2
-                    }
-
-                    # Check if candidate has all required search keys.
+                found = None
+                for idx, (parents, _) in enumerate(port.queue):
+                    candidate_suffixes = {":" + ":".join(p.split(":")[1:]) for p in parents if p.count(":") >= 2}
                     if search_keys.issubset(candidate_suffixes):
-                        found_idx = idx
+                        found = idx
                         break
-                if found_idx is not None:
-                    parent_indices.append(found_idx)
-                else:
-                    # If any port doesn't provide a matching candidate, move on to the next anchor.
+                if found is None:
                     break
+                candidate_indices.append(found)
 
-            # If a matching candidate is found in all ports, exit the search.
-            if len(parent_indices) == len(self._input_ports):
-                break
-        return parent_indices
+            if len(candidate_indices) == len(self._input_ports):
+                return candidate_indices
 
+        return []  # No alignment yet
+
+    # ------------------------------------------------------------------
     def step(self) -> bool:
-        """
-        Processes messages only when all input ports have received data.
-        Identifies matching parent messages and combines them into one output.
+        if any(not p.queue for p in self._input_ports.values()):
+            return False
 
-        Returns:
-            bool: True if processing occurred, False otherwise.
-        """
-
-        if any(not port.queue for port in self._input_ports.values()):
-            return False  # Exit if any queue is empty
-        # rich_console.print(f"[blue]Running multi agent  {self.__class__.__name__}[/blue]")
-
-
-        # Look up queque indices for all ports
         parent_indices = self._find_parent_indices_2()
-
-
-
         if len(parent_indices) != len(self._input_ports):
             return False
 
-        parent_map = {}
-        model_map = {}
-        staged_removals = []
+        parent_map: Dict[Type[BaseModel], List[str]] = {}
+        model_map: Dict[Type[BaseModel], BaseModel] = {}
+        staged: List[Tuple[Type[BaseModel], int, Tuple[List[str], BaseModel]]] = []
 
-        for port_name, index in zip(self._input_ports, parent_indices):
-            port = self._input_ports[port_name]
-            parents, model = port.queue[index]
+        for port_schema, idx in zip(self.input_schemas, parent_indices):
+            port = self._input_ports[port_schema]
+            parents, model = port.queue[idx]
 
-            # Store in the map for later processing
-            parent_map[port_name] = parents
-            model_map[port_name] = model
+            parent_map[port_schema] = parents
+            model_map[port_schema] = model
 
-            # Stage the removal in case we need to roll back
-            staged_removals.append((port_name, index, (parents, model)))
+            staged.append((port_schema, idx, (parents, model)))
+            del port.queue[idx]
 
-            # Remove from queue
-            del port.queue[index]
-
-        #  Finds the longest common prefix among lists stored in a dictionary. Return a list of the matching per port
         join_parents = longest_common_sublist(parent_map)
-
 
         try:
             if self.debugger:
                 for data in model_map.values():
-                    self.debugger.input(self, data, parents)
-            output_msg = self.run(model_map)
+                    self.debugger.input(self, data, join_parents)
+            output_msg = self.run(model_map)  # type: ignore[attr-defined]
             if self.debugger:
-                self.debugger.output(self, output_msg, parents)
+                self.debugger.output(self, output_msg, join_parents)
         except Exception as e:
-            for del_name, del_idx, removed_item in staged_removals:
-                self._input_ports[del_name].queue.insert(del_idx, removed_item)
-            # Raise a scheduler-specific exception for higher-level handling
+            for schema, idx, item in staged:
+                self._input_ports[schema].queue.insert(idx, item)
             raise SchedulerException(self.__class__.__name__, "Processing multi step failed", e)
 
         self._send_output_msg(output_msg, join_parents)
-
         return True
 
-
-
-
+    # ------------------------------------------------------------------
     def _gather_ports(self) -> Dict[str, ToolPort]:
-        """
-        Override to return all input ports plus the single output port
-        under whichever keys we prefer. Something like:
-
-        {
-          "<input_port_name>": <ToolPort object>,
-          ...
-          "output_port": <ToolPort>
+        ports: Dict[str, ToolPort] = {
+            f"input_{idx}": self._input_ports[schema]
+            for idx, schema in enumerate(self.input_schemas)
         }
-        """
-        ports = {}
-        # Add each input port by its dictionary key
-        for in_name, port in self._input_ports.items():
-            ports[f"input_{in_name}"] = port  # or just use in_name directly
-
-            # ---- new multi‑output mapping --------------------------------------
-        if getattr(self, "_output_ports", None):
-            for schema, port in self._output_ports.items():
-                if port is not None:
-                    ports[f"output_ports:{schema.__name__}"] = port
-
-            # ---- legacy single output ------------------------------------------
-            # (keep so we can still restore really old checkpoints)
+        for schema, port in self._output_ports.items():
+            ports[f"output_ports:{schema.__name__}"] = port
         if getattr(self, "_output_port", None):
             ports["output_port"] = self._output_port
         return ports
 
+    # ------------------------------------------------------------------
     def load_state(self, state_dict: dict):
-        """
-        Optionally override load_state() if you want fine-grained control of
-        which schema is used for each input port.
-
-        By default, we'll rely on the parent's load_state but
-        we need a consistent way to pick the correct schema for each input port.
-        """
-        # 1) restore internal state
         if state_dict.get("state") and self.state_schema:
             self._state = self.state_schema(**state_dict["state"])
 
-        # 2) For each port, load from state but pick the right schema
-        for port_name, port_obj in self._gather_ports().items():
-            port_state = state_dict.get("ports", {}).get(port_name, {})
+        for pname, pobj in self._gather_ports().items():
+            pstate = state_dict.get("ports", {}).get(pname, {})
 
-            # Figure out which schema to use. If it's an input, we parse out the original in_name.
-            if port_name.startswith("input_"):
-                in_name = port_name.replace("input_", "")
-                schema = self.input_schemas.get(in_name)
+            if pname.startswith("input_"):
+                idx = int(pname[len("input_"):])
+                schema = self.input_schemas[idx]
             else:
-                # Must be the output port
-                schema = self.output_schema
+                if self.output_schema:
+                    schema = self.output_schema
+                else:
+                    schema_name = pname.split(":", 1)[1]
+                    schema = next(s for s in self._output_ports if s.__name__ == schema_name)
 
-            self._load_port(port_obj, port_state, schema)
+            self._load_port(pobj, pstate, schema)

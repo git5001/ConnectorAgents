@@ -37,11 +37,10 @@ class CentralWorkerAgent(MultiPortAgent):
     """Orchestrates the research loop."""
 
     input_schema = EnhancedQueryOutput
-    input_schemas = {
-        "enhancer": EnhancedQueryOutput,
-        "searcher": TavilySearchToolOutputSchema,
-        "summarizer": TavilySearchListModel,
-    }
+    input_schemas = [EnhancedQueryOutput,
+                     TavilySearchToolOutputSchema,
+                     TavilySearchListModel]
+
     # Can output either a list of SearchTaskInput *or* ReportOutput
     output_schemas = [TavilySearchToolInputSchema,
                       PageSummaryItemSchema,
@@ -57,8 +56,8 @@ class CentralWorkerAgent(MultiPortAgent):
     def run(self, inputs: Dict[str, BaseModel]):
         print("Worker got inputs ", type(inputs), inputs.keys())
         # First input path – the enhanced query goes to a web search
-        if "enhancer" in inputs:
-            eq: EnhancedQueryOutput = inputs["enhancer"]
+        if EnhancedQueryOutput in inputs:
+            eq: EnhancedQueryOutput = inputs[EnhancedQueryOutput]
             self.iterations += 1
             print(f"[Worker] Planning searches for '{eq.search}'")
             # Store state
@@ -71,8 +70,8 @@ class CentralWorkerAgent(MultiPortAgent):
             )
             return tavily_input
         # Second input path – the web search shall be summarized as page summary
-        if "searcher" in inputs:
-            ts: TavilySearchToolOutputSchema = inputs["searcher"]
+        if TavilySearchToolOutputSchema in inputs:
+            ts: TavilySearchToolOutputSchema = inputs[TavilySearchToolOutputSchema]
             print(f"[Worker] Received search results #={len(ts.results)} for '{self._state.original}'")
             self.iterations += 1
             # Copy list over to enhancce it with research query, taht is we wrap the result and add an item
@@ -88,8 +87,8 @@ class CentralWorkerAgent(MultiPortAgent):
                 pagesInputList.append(pageItem)
             return pagesInputList
         # Third input path – the page summary goes to the synthezier
-        if "summarizer" in inputs:
-            lm: TavilySearchListModel = inputs["summarizer"]
+        if TavilySearchListModel in inputs:
+            lm: TavilySearchListModel = inputs[TavilySearchListModel]
             print(f"[Worker] Received summary results {len(lm.data)} for '{self._state.original}'")
 
             self.iterations += 1

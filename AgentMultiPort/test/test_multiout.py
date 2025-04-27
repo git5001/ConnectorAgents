@@ -62,8 +62,8 @@ def main():
     bufferAgent_1 = IdentityAgent(config=IdentityAgentConfig(), uuid='multi_1')
     bufferAgent_2 = IdentityAgent(config=IdentityAgentConfig(), uuid='multi_2')
 
-    multiAgent.connectTo(bufferAgent_1, output_schema=MultiOutSimpleAgentSchema1)
-    multiAgent.connectTo(bufferAgent_2, output_schema=MultiOutSimpleAgentSchema2)
+    multiAgent.connectTo(bufferAgent_1, source_output_schema=MultiOutSimpleAgentSchema1)
+    multiAgent.connectTo(bufferAgent_2, source_output_schema=MultiOutSimpleAgentSchema2)
 
 
 

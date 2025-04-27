@@ -25,11 +25,11 @@ class FinalCollectPortAggregatorAgent(MultiPortAggregatorAgent):
         input_schemas (Dict[str, Type[BaseModel]]): Specifies expected input schemas.
         output_schema (Type[BaseModel]): Defines the expected output schema.
     """
-    input_schemas = {
-        "rawCategories": ListModel,
-        "finalCategories": KategorieGeneralisierungAntwort,
-        "bookmarks": FirefoxBookmarksOutput,
-    }
+    input_schemas = [
+        ListModel,
+        KategorieGeneralisierungAntwort,
+        FirefoxBookmarksOutput,
+    ]
     output_schema = FirefoxBookmarksOutput
 
     def __init__(self, config: LLMAgentConfig, uuid: str = 'default') -> None:
@@ -97,9 +97,9 @@ class FinalCollectPortAggregatorAgent(MultiPortAggregatorAgent):
         Returns:
             MergedOutput: A structured output containing aggregated information.
         """
-        rawCategories: ListModel = inputs["rawCategories"]
-        finalCategories: KategorieGeneralisierungAntwort = inputs["finalCategories"]
-        firefoxBookmarks: FirefoxBookmarksOutput = inputs["bookmarks"]
+        rawCategories: ListModel = inputs[ListModel]
+        finalCategories: KategorieGeneralisierungAntwort = inputs[KategorieGeneralisierungAntwort]
+        firefoxBookmarks: FirefoxBookmarksOutput = inputs[FirefoxBookmarksOutput]
 
         listData:List[GenerateCategoryForBookmarkOutput] = rawCategories.data
         categoryList: List[NormalisierteKategorie] = finalCategories.kategorien

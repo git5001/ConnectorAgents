@@ -13,6 +13,7 @@ class UserQueryInput(BaseIOSchema):
 class EnhancedQueryOutput(BaseIOSchema):
     """
     Schema for output enhancing
+    Alias: enhancer
     """
     original: str = Field(..., description="User original research question")
     search:str = Field(..., description="User research question for web search")
@@ -64,6 +65,7 @@ class DebugModel(BaseModel):
 class TavilySearchListModel(BaseModel):
     """
     The resulting list data.
+    Alias: synthesis
     """
     data: List[PageSummary] = Field(default_factory=list, description="Combined list result")
 

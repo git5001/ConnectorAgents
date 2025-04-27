@@ -11,7 +11,8 @@ from pydantic import HttpUrl, TypeAdapter
 from AgentBookmarks.WebpageToCategoryAgent import WebpageToCategoryAgent, WebpageToCategoryInput, BookmarkOutput
 from AgentBookmarks.BookmarkMultiPortAggregatorAgent import BookmarkMultiPortAggregatorAgent, \
     BookmarkMultiPortAggregatorAgentConfig
-from AgentBookmarks.CategoryGeneralizationLLMAgent import CategoryGeneralizationLLMAgent
+from AgentBookmarks.CategoryGeneralizationLLMAgent import CategoryGeneralizationLLMAgent, \
+    KategorieGeneralisierungAntwort
 from AgentBookmarks.CategoryMultiPortAggregatorAgent import CategoryMultiPortAggregatorAgentConfig, \
     CategoryMultiPortAggregatorAgent
 from AgentBookmarks.DummyWebScraperAgent import DummyWebScraperAgent
@@ -19,11 +20,12 @@ from AgentBookmarks.FinalCollectPortAggregatorAgent import FinalCollectPortAggre
 from AgentBookmarks.FirefoxBookmarkAgent import FirefoxBookmarkAgentConfig, FirefoxBookmarkAgent, \
     FirefoxBookmarksOutput, Bookmark
 from AgentBookmarks.FirefoxBookmarkStorageAgent import FirefoxBookmarkStorageAgent, FirefoxBookmarkStorageAgentConfig
-from AgentBookmarks.GenerateCategoryForBookmarkAgent import GenerateCategoryForBookmarkAgent
+from AgentBookmarks.GenerateCategoryForBookmarkAgent import GenerateCategoryForBookmarkAgent, \
+    GenerateCategoryForBookmarkOutput
 from AgentBookmarks.WebScraperAgent import WebScraperAgent
 from AgentFramework.AgentScheduler import AgentScheduler
 from AgentFramework.CounterAgent import CounterAgent, CounterSchema, CounterAgentConfig
-from AgentFramework.ListCollectionAgent import ListCollectionAgent
+from AgentFramework.ListCollectionAgent import ListCollectionAgent, ListModel
 from AgentFramework.LoadJsonAgent import LoadJsonAgentConfig, LoadJsonAgent
 from AgentFramework.PiplinePrinter import PipelinePrinter
 from AgentFramework.SaveJsonAgent import SaveJsonAgentConfig, SaveJsonAgent
@@ -51,7 +53,6 @@ def main():
     LLM_LOG_DIR = f"{BASE_DIR}/log"
 
     #RESTORE_DIR = "T:/tmp/agents/scheduler_save/step_59"
-    #RESTORE_DIR = "T:/tmp/agents/scheduler_save/step_2660"
     RESTORE_DIR = None
 
     USE_LARGE_MODELS = True
@@ -70,8 +71,9 @@ def main():
     OPENAI_MODEL_FINAL = "gpt-4o-mini"
 
 
-    SHORT_LOOP_CNT = 10  # -> 3510
     SHORT_LOOP_CNT = None  # -> 3510
+    if DUMMY_WEB:
+        SHORT_LOOP_CNT = 10  # -> 3510
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(DEBUG_DIR, exist_ok=True)
@@ -234,17 +236,17 @@ def main():
     webScraperAgent.connectTo(llmAgent, transformer=transform_webscraper_to_llm)
     webScraperAgent.connectTo(webScraperSaveAgent)
 
-    webScraperAgent.connectTo(mergingAgent, target_port_name="web_scraping_result")
-    llmAgent.connectTo(mergingAgent, target_port_name="llm_result")
-    firefoxLoadAgent.connectTo(mergingAgent, target_port_name="bookmark", transformer=transform_bookmarks_to_aggregator)
+    webScraperAgent.connectTo(mergingAgent, target_input_schema=WebpageScraperToolOutputSchema)
+    llmAgent.connectTo(mergingAgent, target_input_schema=BookmarkOutput)
+    firefoxLoadAgent.connectTo(mergingAgent, target_input_schema=Bookmark, transformer=transform_bookmarks_to_aggregator)
 
     # mergingAgent.connectTo(mergingSaveAgent)
     mergingAgent.connectTo(categoryAgent)
 
-    webScraperAgent.connectTo(mergingAgentCats, target_port_name="web_scraping_result")
-    llmAgent.connectTo(mergingAgentCats, target_port_name="llm_result")
-    firefoxLoadAgent.connectTo(mergingAgentCats, target_port_name="bookmark", transformer=transform_bookmarks_to_aggregator)
-    categoryAgent.connectTo(mergingAgentCats, target_port_name="category")
+    webScraperAgent.connectTo(mergingAgentCats, target_input_schema=WebpageScraperToolOutputSchema)
+    llmAgent.connectTo(mergingAgentCats, target_input_schema=BookmarkOutput)
+    firefoxLoadAgent.connectTo(mergingAgentCats, target_input_schema=Bookmark, transformer=transform_bookmarks_to_aggregator)
+    categoryAgent.connectTo(mergingAgentCats, target_input_schema=GenerateCategoryForBookmarkOutput)
     mergingAgentCats.connectTo(sinkAgent_CollectCats)
 
     llmAgent.connectTo(sinkLLMAgent, transformer=transform_llm_to_counter)
@@ -258,9 +260,9 @@ def main():
 
     catGeneralizeAgent.connectTo(catGeneralizeSaveAgent)
 
-    sinkAgent_Categories.connectTo(mergingFinalAgent, target_port_name="rawCategories")
-    catGeneralizeAgent.connectTo(mergingFinalAgent, target_port_name="finalCategories")
-    firefoxLoadAgent.connectTo(mergingFinalAgent, target_port_name="bookmarks")
+    sinkAgent_Categories.connectTo(mergingFinalAgent, target_input_schema=ListModel)
+    catGeneralizeAgent.connectTo(mergingFinalAgent, target_input_schema=KategorieGeneralisierungAntwort)
+    firefoxLoadAgent.connectTo(mergingFinalAgent, target_input_schema=FirefoxBookmarksOutput)
     mergingFinalAgent.connectTo(mergingSaveFinalAgent)
     mergingFinalAgent.connectTo(firefoxStorageAgent)
 

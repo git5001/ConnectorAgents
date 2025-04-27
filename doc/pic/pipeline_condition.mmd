@@ -1,0 +1,17 @@
+graph LR
+    CountNumbersAgent_1_["CountNumbersAgent#1 "]
+    class CountNumbersAgent_1_ entry_exit;
+    IdentityAgent_1_id_1_["IdentityAgent#1 [id_1]"]
+    CountNumbersAgent_1_ --> IdentityAgent_1_id_1_
+    IdentityAgent_1_id_1_["IdentityAgent#1 [id_1]"]
+    ListCollectionAgent_1_collect_numbers_["ListCollectionAgent#1 [collect_numbers]"]
+    class ListCollectionAgent_1_collect_numbers_ entry_exit;
+    IdentityAgent_1_id_1_ --> ListCollectionAgent_1_collect_numbers_
+    ListCollectionAgent_2_collect_counter_["ListCollectionAgent#2 [collect_counter]"]
+    IdentityAgent_1_id_1_ --> ListCollectionAgent_2_collect_counter_
+    ListCollectionAgent_2_collect_counter_["ListCollectionAgent#2 [collect_counter]"]
+    CounterAgent_1_["CounterAgent#1 "]
+    class CounterAgent_1_ entry_exit;
+    ListCollectionAgent_2_collect_counter_ --> CounterAgent_1_
+
+classDef entry_exit fill:#EDF2FF,stroke:#547DDE,stroke-width:2px;

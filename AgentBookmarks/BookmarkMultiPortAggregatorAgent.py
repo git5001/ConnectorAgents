@@ -46,11 +46,11 @@ class BookmarkMultiPortAggregatorAgent(MultiPortAggregatorAgent):
         input_schemas (Dict[str, Type[BaseModel]]): Mapping of expected input types for each source.
         output_schema (Type[BaseModel]): The final merged schema produced by the agent.
     """
-    input_schemas = {
-        "web_scraping_result": WebpageScraperToolOutputSchema,
-        "llm_result": BookmarkOutput,
-        "bookmark": Bookmark,
-    }
+    input_schemas = [
+        WebpageScraperToolOutputSchema,
+        BookmarkOutput,
+        Bookmark,
+    ]
     output_schema = BookmarkMultiPortAggregatorOutput
 
     def run(self, inputs: Dict[str, BaseModel]) -> BaseModel:
@@ -61,16 +61,16 @@ class BookmarkMultiPortAggregatorAgent(MultiPortAggregatorAgent):
             inputs (Dict[str,  BaseModel]):
                 A dictionary where keys identify the input type and values are (source_id, data) tuples.
                 Expected keys are:
-                    - "web_scraping_result": Tuple containing the webpage scraper output
-                    - "llm_result": Tuple containing the LLM's output
-                    - "bookmark": Tuple containing the raw bookmark data
+                    - WebpageScraperToolOutputSchema: Tuple containing the webpage scraper output
+                    - BookmarkOutput: Tuple containing the LLM's output
+                    - Bookmark: Tuple containing the raw bookmark data
 
         Returns:
             BookmarkMultiPortAggregatorOutput: Combined structured output of the agent.
         """
-        web_scraping_result: WebpageScraperToolOutputSchema = inputs["web_scraping_result"]
-        llm_result: BookmarkOutput = inputs["llm_result"]
-        bookmark: Bookmark = inputs["bookmark"]
+        web_scraping_result: WebpageScraperToolOutputSchema = inputs[WebpageScraperToolOutputSchema]
+        llm_result: BookmarkOutput = inputs[BookmarkOutput]
+        bookmark: Bookmark = inputs[Bookmark]
 
         # Return the unified output structure
         return BookmarkMultiPortAggregatorOutput(

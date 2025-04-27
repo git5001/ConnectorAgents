@@ -39,12 +39,12 @@ class CategoryMultiPortAggregatorAgent(MultiPortAggregatorAgent):
         input_schemas (Dict[str, Type[BaseModel]]): Specifies expected input schemas.
         output_schema (Type[BaseModel]): Defines the expected output schema.
     """
-    input_schemas = {
-        "web_scraping_result": WebpageScraperToolOutputSchema,
-        "llm_result": BookmarkOutput,
-        "bookmark": Bookmark,
-        "category": GenerateCategoryForBookmarkOutput
-    }
+    input_schemas = [
+        WebpageScraperToolOutputSchema,
+        BookmarkOutput,
+        Bookmark,
+        GenerateCategoryForBookmarkOutput
+    ]
     output_schema = CategoryMultiPortAggregatorOutput
 
     def run(self, inputs: Dict[str, Tuple[str, BaseModel]]) -> BaseModel:
@@ -57,10 +57,10 @@ class CategoryMultiPortAggregatorAgent(MultiPortAggregatorAgent):
         Returns:
             MergedOutput: A structured output containing aggregated information.
         """
-        web_scraping_result: WebpageScraperToolOutputSchema = inputs["web_scraping_result"]
-        llm_result: BookmarkOutput = inputs["llm_result"]
-        bookmark: Bookmark = inputs["bookmark"]
-        category: Bookmark = inputs["category"]
+        web_scraping_result: WebpageScraperToolOutputSchema = inputs[WebpageScraperToolOutputSchema]
+        llm_result: BookmarkOutput = inputs[BookmarkOutput]
+        bookmark: Bookmark = inputs[Bookmark]
+        category: GenerateCategoryForBookmarkOutput = inputs[GenerateCategoryForBookmarkOutput]
 
         return CategoryMultiPortAggregatorOutput(
             webpage=web_scraping_result,

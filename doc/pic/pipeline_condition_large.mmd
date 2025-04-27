@@ -1,0 +1,26 @@
+graph LR
+    CountNumbersAgent_1_["CountNumbersAgent#1 "]
+classDef schema fill:#FFD,stroke:#333,stroke-width:1px,font-size:10px;
+    class CountNumbersAgent_1_ entry_exit;
+    IdentityAgent_1_id_1_["IdentityAgent#1 [id_1]"]
+    CountNumbersAgent_1__IdentityAgent_1_id_1____schema["CountNumbersAgentSchema →<br/>→ BaseIOSchema"]:::schema
+    CountNumbersAgent_1_ --> CountNumbersAgent_1__IdentityAgent_1_id_1____schema
+    CountNumbersAgent_1__IdentityAgent_1_id_1____schema --> IdentityAgent_1_id_1_
+    IdentityAgent_1_id_1_["IdentityAgent#1 [id_1]"]
+    ListCollectionAgent_1_collect_numbers_["ListCollectionAgent#1 [collect_numbers]"]
+    class ListCollectionAgent_1_collect_numbers_ entry_exit;
+    IdentityAgent_1_id_1__ListCollectionAgent_1_collect_numbers____schema["NullSchema →<br/>→ BaseIOSchema"]:::schema
+    IdentityAgent_1_id_1_ --> IdentityAgent_1_id_1__ListCollectionAgent_1_collect_numbers____schema
+    IdentityAgent_1_id_1__ListCollectionAgent_1_collect_numbers____schema --> ListCollectionAgent_1_collect_numbers_
+    ListCollectionAgent_2_collect_counter_["ListCollectionAgent#2 [collect_counter]"]
+    IdentityAgent_1_id_1__ListCollectionAgent_2_collect_counter____schema["NullSchema →<br/>→ BaseIOSchema"]:::schema
+    IdentityAgent_1_id_1_ --> IdentityAgent_1_id_1__ListCollectionAgent_2_collect_counter____schema
+    IdentityAgent_1_id_1__ListCollectionAgent_2_collect_counter____schema --> ListCollectionAgent_2_collect_counter_
+    ListCollectionAgent_2_collect_counter_["ListCollectionAgent#2 [collect_counter]"]
+    CounterAgent_1_["CounterAgent#1 "]
+    class CounterAgent_1_ entry_exit;
+    ListCollectionAgent_2_collect_counter__CounterAgent_1____schema["BaseIOSchema"]:::schema
+    ListCollectionAgent_2_collect_counter_ --> ListCollectionAgent_2_collect_counter__CounterAgent_1____schema
+    ListCollectionAgent_2_collect_counter__CounterAgent_1____schema --> CounterAgent_1_
+
+classDef entry_exit fill:#EDF2FF,stroke:#547DDE,stroke-width:2px;

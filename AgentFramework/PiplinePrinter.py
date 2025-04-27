@@ -185,6 +185,25 @@ class PipelinePrinter:
         return edges
 
     # ------------------------------------------------------------------ low‑level helpers
+    @staticmethod
+    def _get_schema_alias(schema_cls: Type[BaseModel]) -> str:
+        """Returns the alias of a schema class, parsed from its docstring or shortened class name."""
+        import inspect
+        import re
+
+        doc = inspect.cleandoc(schema_cls.__doc__ or "")
+        match = re.search(r"^Alias:\s*(.+)$", doc, re.MULTILINE)
+        if match:
+            return match.group(1)
+        else:
+            # Fallback to clean class name shortening
+            name = schema_cls.__name__
+            suffixes = ["InputSchema", "OutputSchema", "Schema", "Model"]
+            for suffix in suffixes:
+                if name.endswith(suffix):
+                    return name[:-len(suffix)]
+            return name
+
 
     @staticmethod
     def _iter_output_ports(agent: "ConnectedAgent"):
@@ -253,12 +272,26 @@ class PipelinePrinter:
         return getattr(agent, "output_schema", None)
 
     @staticmethod
+    def _port_key_to_label(key) -> str:
+        """
+        Map a dict key (which may be a `Type[BaseModel]` or a plain string)
+        to the text we want to see on an edge label.
+        """
+        import inspect
+        if inspect.isclass(key):
+            # multi-port key is a schema type – default to its class name
+            alias = PipelinePrinter._get_schema_alias(key)
+            return f"{alias}" # {key.__name__}
+        return str(key)
+
+    @staticmethod
     def _find_port_name(agent: "ConnectedAgent", port_obj: "ToolPort") -> str:
         """Return '@<input_name>' if *agent* is multi‑port and *port_obj* matches."""
         if hasattr(agent, "_input_ports"):
             for name, p in agent._input_ports.items():
                 if p is port_obj:
-                    return f"@{name}"
+                    return f"@{PipelinePrinter._port_key_to_label(name)}"
+                    # WAS return f"@{name}"
         return ""
 
     # ------------------------------------------------------------------ renderers

@@ -1,0 +1,20 @@
+digraph pipeline {
+  rankdir=LR;
+  bgcolor=transparent;
+  node [shape=box, style="rounded,filled", fillcolor="lightblue", color="blue", fontcolor="black"];
+  "ListCollectionAgent#1 [collect_numbers]" [fillcolor="lightyellow", color="blue"];
+  "CounterAgent#1 " [fillcolor="lightyellow", color="blue"];
+  "CountNumbersAgent#1 " [fillcolor="lightyellow", color="blue"];
+  "CountNumbersAgent#1 _IdentityAgent#1 [id_1]_@_schema" [label="CountNumbersAgentSchema →\n→ BaseIOSchema", shape=note, style=filled, fontsize=8, margin=0.05, width=0.0, height=0.0, color="black", penwidth=0.5, fillcolor="moccasin"];
+  "CountNumbersAgent#1 " -> "CountNumbersAgent#1 _IdentityAgent#1 [id_1]_@_schema" [color=blue, arrowsize=0.75];
+  "CountNumbersAgent#1 _IdentityAgent#1 [id_1]_@_schema" -> "IdentityAgent#1 [id_1]" [color=blue, arrowsize=0.75];
+  "IdentityAgent#1 [id_1]_ListCollectionAgent#1 [collect_numbers]_@_schema" [label="NullSchema →\n→ BaseIOSchema", shape=note, style=filled, fontsize=8, margin=0.05, width=0.0, height=0.0, color="black", penwidth=0.5, fillcolor="moccasin"];
+  "IdentityAgent#1 [id_1]" -> "IdentityAgent#1 [id_1]_ListCollectionAgent#1 [collect_numbers]_@_schema" [color=blue, arrowsize=0.75];
+  "IdentityAgent#1 [id_1]_ListCollectionAgent#1 [collect_numbers]_@_schema" -> "ListCollectionAgent#1 [collect_numbers]" [color=blue, arrowsize=0.75];
+  "IdentityAgent#1 [id_1]_ListCollectionAgent#2 [collect_counter]_@_schema" [label="NullSchema →\n→ BaseIOSchema", shape=note, style=filled, fontsize=8, margin=0.05, width=0.0, height=0.0, color="black", penwidth=0.5, fillcolor="moccasin"];
+  "IdentityAgent#1 [id_1]" -> "IdentityAgent#1 [id_1]_ListCollectionAgent#2 [collect_counter]_@_schema" [color=blue, arrowsize=0.75];
+  "IdentityAgent#1 [id_1]_ListCollectionAgent#2 [collect_counter]_@_schema" -> "ListCollectionAgent#2 [collect_counter]" [color=blue, arrowsize=0.75];
+  "ListCollectionAgent#2 [collect_counter]_CounterAgent#1 _@_schema" [label="BaseIOSchema", shape=note, style=filled, fontsize=8, margin=0.05, width=0.0, height=0.0, color="black", penwidth=0.5, fillcolor="moccasin"];
+  "ListCollectionAgent#2 [collect_counter]" -> "ListCollectionAgent#2 [collect_counter]_CounterAgent#1 _@_schema" [color=seagreen, arrowsize=0.75];
+  "ListCollectionAgent#2 [collect_counter]_CounterAgent#1 _@_schema" -> "CounterAgent#1 " [color=seagreen, arrowsize=0.75];
+}

@@ -86,16 +86,20 @@ and organizing the content under clear, informative headings.
     4. Limitations  
     5. Conclusion  
     6. References (optional section)  
-Note: No section or no inserted sub-section must be too short.
-If you have too short sub-sections, either combine them, make them a list
-or flesh them out. We want to avoid once sentence sub-sections.  
 
 Goal is a comprehensive well structured report about the research question.
 A complicated topic justifies a lengthy report.
 
-### Rules:
+### Content rules:
+- The output must be very extensive and comprehensive, at least 3000 words long
+- Elaborate all topics in great detail  
+- No section or no inserted sub-section must be too short. 
+  If you have too short sub-sections, either combine them, make them a list
+  or flesh them out. We must avoid "one" sentence sub-sections.  
+
+### Format Rules:
 - Paraphrase rather than quote unless wording is essential.  
-- Use in-text attribution like `(Title)` where helpful to trace claims.  
+- Use in-text attribution like `(Title)` where helpful to trace claims.
 - Do NOT mention web pages or metadata, make scientific style references on the provided URLs.
 - Never invent references, better leave them out than inventing them.
   Use only references and URLs given in the input. 

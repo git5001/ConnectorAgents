@@ -40,7 +40,9 @@ class TavilySearchResultItemSchema(BaseIOSchema):
 
 
 class TavilySearchToolOutputSchema(BaseIOSchema):
-    """This schema represents the output of the Tavily search tool."""
+    """This schema represents the output of the Tavily search tool.
+    Alias: search
+    """
 
     results: List[TavilySearchResultItemSchema] = Field(..., description="List of search result items")
 

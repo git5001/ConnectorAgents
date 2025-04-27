@@ -83,9 +83,10 @@ Produce two improved versions:
 
 2. **enhanced** – a well-formed research question suitable for defining and  designing an academic report.
    - Rewrite in formal English, clarify scope, add any obviously missing variables
-     (e.g., time-frame, population, metric) inferred from context.  
+     (e.g., time-frame, population, metric) inferred from context.
+   - Cover side and slightly related topics to generate a fully runded research  
    - several full sentences, clear and precise.
-   - The enhanced question is the definition for a research report
+   - The enhanced question is the definition question for a research report
    
 
 **Rules**

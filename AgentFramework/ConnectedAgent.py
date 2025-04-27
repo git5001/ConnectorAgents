@@ -117,8 +117,8 @@ class ConnectedAgent(BaseTool):
     def connectTo(self,
                   target_agent: "ConnectedAgent",
                   transformer: Optional[Callable[[BaseModel], Union[BaseModel, List[BaseModel]]]] = None,
-                  target_port_name:str = None,
-                  output_schema:Type[BaseModel] = None,
+                  target_input_schema:str = None,
+                  source_output_schema:Type[BaseModel] = None,
                   condition: Optional[Callable[[BaseModel], bool]] = None,
                   ) -> None:
         """
@@ -128,29 +128,31 @@ class ConnectedAgent(BaseTool):
             target_agent (ConenctedAgent): The target agent.
             transformer (Optional[Callable[[BaseModel], Union[BaseModel, List[BaseModel]]]], optional):
                 A function to transform messages before sending. Defaults to None.
-            target_port_name(str): optional target port name, for multi port agents
-            output_schema(Type[BaseModel]): Optional the schema to connect to (only if more than one)
+            target_input_schema(str): optional target port name, for multi port agents
+            source_output_schema(Type[BaseModel]): Optional the schema to connect to (only if more than one)
             condition(Optional[Callable[BaseModel]]): A condition function
 
         Raises:
             ValueError: If an invalid port direction is used.
         """
 
-        input_port = target_agent._find_input_port(target_port_name)
+        input_port = target_agent._find_input_port(target_input_schema)
         # If we have only one schema we can use it directly
-        if not output_schema:
-            output_schema = self.output_schema
-        output_port = self._find_output_port(output_schema)
+        if not source_output_schema:
+            source_output_schema = self.output_schema
+        output_port = self._find_output_port(source_output_schema)
+        if not output_port:
+            raise ValueError(f"No output port found for schema {source_output_schema} in {self.__class__.__name__}")
         output_port.connect(input_port, transformer=transformer, source=self, target=target_agent, condition=condition)
 
-    def _find_input_port(self, source_port_name:str = None):
+    def _find_input_port(self, source_port_schema:Type[BaseModel] = None):
 
         """
         Finds a port with a given name or the default port if no name
-        :param source_port_name: Name of port or none
+        :param source_port_schema: Schema of port or none
         :return: The port
         """
-        if not source_port_name:
+        if not source_port_schema:
             return self._input_port
         raise NotImplementedError("Multi port not implemented ")
 
