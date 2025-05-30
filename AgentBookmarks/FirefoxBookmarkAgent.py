@@ -4,10 +4,8 @@ import json
 
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 from pydantic import BaseModel, Field
-from atomic_agents.agents.base_agent import BaseAgent, BaseAgentConfig
-from AgentFramework.ConnectedAgent import ConnectedAgent
+from AgentFramework.core.ConnectedAgent import ConnectedAgent
 from bs4 import BeautifulSoup
-from pydantic import TypeAdapter
 
 
 # Define the Bookmark model representing a single bookmark entry.

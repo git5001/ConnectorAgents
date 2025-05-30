@@ -17,3 +17,4 @@
 /AgentDeepResearch/test/*.env
 **/.env
 **/*.env
+/AgentBookmarks/test/test_ollama_up.py

@@ -6,14 +6,13 @@ from pydantic import BaseModel, Field
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 
 from AgentBookmarks.WebpageToCategoryAgent import BookmarkOutput
-from AgentBookmarks.FirefoxBookmarkAgent import FirefoxBookmarksOutput, Bookmark
+from AgentBookmarks.FirefoxBookmarkAgent import Bookmark
 from AgentBookmarks.GenerateCategoryForBookmarkAgent import GenerateCategoryForBookmarkOutput
-from AtomicTools.tavily_search.tool.tavily_search import TavilySearchToolOutputSchema
+from AgentFramework.core.MultiPortAgent import MultiPortAgent
 from AtomicTools.webpage_scraper.tool.webpage_scraper import WebpageScraperToolOutputSchema
 
-from AgentFramework.MultiPortAggregatorAgent import MultiPortAggregatorAgent
 
-from AgentNews.NewsSchema import MergedOutput, LLMNewsOutput
+from AgentNews.NewsSchema import MergedOutput
 
 
 class CategoryMultiPortAggregatorAgentConfig(BaseToolConfig):
@@ -31,7 +30,7 @@ class CategoryMultiPortAggregatorOutput(BaseIOSchema):
     category:GenerateCategoryForBookmarkOutput = Field(..., description="The calcalted category")
 
 
-class CategoryMultiPortAggregatorAgent(MultiPortAggregatorAgent):
+class CategoryMultiPortAggregatorAgent(MultiPortAgent):
     """
     Agent that merges search results, web scraping results, and LLM-generated news into a unified data structure.
 

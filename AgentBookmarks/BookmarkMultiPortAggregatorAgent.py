@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict
 
 from atomic_agents.lib.base.base_io_schema import BaseIOSchema
 from pydantic import BaseModel, Field
@@ -6,12 +6,10 @@ from pydantic import BaseModel, Field
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 
 from AgentBookmarks.WebpageToCategoryAgent import BookmarkOutput
-from AgentBookmarks.FirefoxBookmarkAgent import FirefoxBookmarksOutput, Bookmark
+from AgentBookmarks.FirefoxBookmarkAgent import Bookmark
 from AtomicTools.webpage_scraper.tool.webpage_scraper import WebpageScraperToolOutputSchema
 
-from AgentFramework.MultiPortAggregatorAgent import MultiPortAggregatorAgent
-
-from AgentNews.NewsSchema import MergedOutput, LLMNewsOutput
+from AgentFramework.core.MultiPortAgent import MultiPortAggregatorAgent
 
 
 class BookmarkMultiPortAggregatorAgentConfig(BaseToolConfig):

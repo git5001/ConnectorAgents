@@ -64,7 +64,7 @@ def transform_tavily_to_webscraper(output_msg: TavilySearchToolOutputSchema) -> 
 
 
 # Interconnect agents
-tavilyAgent.connectTo(webScraper, transformer=transform_tavily_to_webscraper)
+tavilyAgent.connectTo(webScraper, pre_transformer=transform_tavily_to_webscraper)
 ...
 
 # Schedule agents

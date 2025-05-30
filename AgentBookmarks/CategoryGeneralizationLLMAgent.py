@@ -6,8 +6,8 @@ from atomic_agents.lib.base.base_io_schema import BaseIOSchema
 from pydantic import BaseModel, Field
 
 from AgentBookmarks.CategoryMultiPortAggregatorAgent import CategoryMultiPortAggregatorOutput
-from AgentFramework.ConnectedAgent import ConnectedAgent
-from AgentFramework.ListCollectionAgent import ListModel
+from AgentFramework.core.ConnectedAgent import ConnectedAgent
+from AgentFramework.core.ListCollectionAgent import ListModel
 from agent_config import DUMMY_LLM
 from agent_logging import logger, rich_console
 from util.LLMSupport import LLMModel, LLMAgentConfig
@@ -132,7 +132,7 @@ class CategoryGeneralizationLLMAgent(ConnectedAgent):
             sysprompt = None
             userprompt =  self._prompt(result_string)
             try:
-                result_object, usage = self.model.execute_llm_schema(sysprompt, userprompt, targetType=self.output_schema, title='Step Generalize')
+                result_object, usage = self.model.hl_pydantic_completions(sysprompt, userprompt, targetType=self.output_schema, title='Step Generalize')
                 rich_console.print("+ Normalisierte Kategorien:")
                 for i, kategorie in enumerate(result_object.kategorien, 1):
                     rich_console.print(f"  {i}. Hauptkategorie: {kategorie.hauptkategorie} | Unterkategorie: {kategorie.unterkategorie}")

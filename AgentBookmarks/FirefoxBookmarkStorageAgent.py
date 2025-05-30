@@ -1,13 +1,12 @@
 import os
 
 from atomic_agents.lib.base.base_tool import BaseToolConfig
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from pydantic import Field
 
 from AgentBookmarks.BookmarkManager import BookmarkManager
 from AgentBookmarks.FirefoxBookmarkAgent import FirefoxBookmarksOutput
-from AgentFramework.ConnectedAgent import ConnectedAgent
-from AgentFramework.NullSchema import NullSchema
+from AgentFramework.core.ConnectedAgent import ConnectedAgent
+from AgentFramework.core.NullSchema import NullSchema
 
 
 # ---------------------------------------------------------------------

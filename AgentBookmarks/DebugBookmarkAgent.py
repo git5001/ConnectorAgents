@@ -1,12 +1,10 @@
 from pydantic import BaseModel
 
-
-from atomic_agents.lib.base.base_io_schema import BaseIOSchema
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 
 from AgentBookmarks.FirefoxBookmarkAgent import FirefoxBookmarksOutput
-from AgentFramework.ConnectedAgent import ConnectedAgent
-from AgentFramework.NullSchema import NullSchema
+from AgentFramework.core.ConnectedAgent import ConnectedAgent
+from AgentFramework.core.NullSchema import NullSchema
 from agent_logging import rich_console
 
 

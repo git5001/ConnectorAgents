@@ -1,27 +1,17 @@
-import logging
 import textwrap
-from typing import Optional, List, Type, Tuple
+from typing import Optional, List, Type
 
-import json5
 from atomic_agents.lib.base.base_io_schema import BaseIOSchema
-from atomic_agents.lib.base.base_tool import BaseToolConfig
 from atomic_agents.lib.components.system_prompt_generator import SystemPromptGenerator
 from openai import BaseModel
-from openai.types import CompletionUsage
 from pydantic import Field
-from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type, before_sleep_log, RetryCallState
 
-from AgentFramework.ConnectedAgent import ConnectedAgent
+from AgentFramework.core.ConnectedAgent import ConnectedAgent
 from AtomicTools.webpage_scraper.tool.webpage_scraper import WebpageMetadata
 from agent_config import DUMMY_LLM
 from agent_logging import logger, rich_console
-from util.LLMSupport import LLMModel, Provider, LLMAgentConfig
-from util.SchemaUtils import generate_template_json, clean_json_string
-
-
-
-
-
+from util.LLMSupport import LLMModel, LLMAgentConfig
+from util.SchemaUtils import generate_template_json
 
 
 # -----------------------------------------------------------------------------
@@ -178,7 +168,7 @@ class WebpageToCategoryAgent(ConnectedAgent):
             sysprompt = system_prompt_generator.generate_prompt()
 
             try:
-                result_object, usage = self.model.execute_llm_schema(sysprompt,
+                result_object, usage = self.model.hl_pydantic_completions(sysprompt,
                                                                  user_prompt,
                                                                  targetType=self.output_schema,
                                                                  fix_function=self.fix_function,

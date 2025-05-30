@@ -1,17 +1,12 @@
-import os
-from typing import List, Dict
-
-from pydantic import BaseModel, TypeAdapter, Field
-from rich.console import Console
+from pydantic import Field
 
 from atomic_agents.lib.base.base_io_schema import BaseIOSchema
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 
-from AgentFramework.ConnectedAgent import ConnectedAgent
-from AgentFramework.InfiniteSchema import InfiniteSchema
-from AgentFramework.ListCollectionAgent import ListModel
-from AgentFramework.NullSchema import NullSchema
-from agent_logging import rich_console
+from AgentFramework.core.ConnectedAgent import ConnectedAgent
+from AgentFramework.core.InfiniteSchema import InfiniteSchema
+from AgentFramework.core.NullSchema import NullSchema
+
 
 class CountNumbersAgentConfig(BaseToolConfig):
     """

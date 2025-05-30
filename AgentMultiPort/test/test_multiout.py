@@ -1,45 +1,14 @@
-import json
 import logging
 import os
 import time
-from pathlib import Path
-from typing import List, Dict
 
-from atomic_agents.lib.base.base_tool import BaseToolConfig
-from dotenv import load_dotenv
-from openai import NOT_GIVEN
-from pydantic import HttpUrl, TypeAdapter, BaseModel
-
-from AgentBookmarks.CountNumbersAgent import CountNumbersAgent, CountNumbersAgentConfig, CountNumbersAgentSchema
-from AgentBookmarks.WebpageToCategoryAgent import WebpageToCategoryAgent, WebpageToCategoryInput, BookmarkOutput
-from AgentBookmarks.BookmarkMultiPortAggregatorAgent import BookmarkMultiPortAggregatorAgent, \
-    BookmarkMultiPortAggregatorAgentConfig
-from AgentBookmarks.CategoryGeneralizationLLMAgent import CategoryGeneralizationLLMAgent
-from AgentBookmarks.CategoryMultiPortAggregatorAgent import CategoryMultiPortAggregatorAgentConfig, \
-    CategoryMultiPortAggregatorAgent
-from AgentBookmarks.DummyWebScraperAgent import DummyWebScraperAgent
-from AgentBookmarks.FinalCollectPortAggregatorAgent import FinalCollectPortAggregatorAgent
-from AgentBookmarks.FirefoxBookmarkAgent import FirefoxBookmarkAgentConfig, FirefoxBookmarkAgent, \
-    FirefoxBookmarksOutput, Bookmark
-from AgentBookmarks.FirefoxBookmarkStorageAgent import FirefoxBookmarkStorageAgent, FirefoxBookmarkStorageAgentConfig
-from AgentBookmarks.GenerateCategoryForBookmarkAgent import GenerateCategoryForBookmarkAgent
-from AgentBookmarks.WebScraperAgent import WebScraperAgent
-from AgentFramework.AgentScheduler import AgentScheduler
-from AgentFramework.CounterAgent import CounterAgent, CounterSchema, CounterAgentConfig
-from AgentFramework.IdentityAgent import IdentityAgent, IdentityAgentConfig
-from AgentFramework.ListCollectionAgent import ListCollectionAgent
-from AgentFramework.LoadJsonAgent import LoadJsonAgentConfig, LoadJsonAgent
-from AgentFramework.NullSchema import NullSchema
-from AgentFramework.PiplinePrinter import PipelinePrinter
-from AgentFramework.SaveJsonAgent import SaveJsonAgentConfig, SaveJsonAgent
+from AgentFramework.core.AgentScheduler import AgentScheduler
+from AgentFramework.core.IdentityAgent import IdentityAgent
+from AgentFramework.core.NullSchema import NullSchema
+from AgentFramework.core.PiplinePrinter import PipelinePrinter
 from AgentMultiPort.MultiOutSimpleAgent import MultiOutSimpleAgentConfig, MultiOutSimpleAgent, \
     MultiOutSimpleAgentSchema1, MultiOutSimpleAgentSchema2
-from AtomicTools.browser_handling.BrowserManager import get_browser_manager
-from AtomicTools.webpage_scraper.tool.webpage_scraper import WebpageScraperToolConfig, WebpageScraperToolInputSchema, \
-    WebpageScraperToolOutputSchema
-from agent_config import DUMMY_WEB
 from agent_logging import rich_console
-from util.LLMSupport import LLMAgentConfig, Provider
 
 # Set up root logger once
 logging.basicConfig(level=logging.INFO)
@@ -59,11 +28,11 @@ def main():
     os.makedirs(LLM_LOG_DIR, exist_ok=True)
 
     multiAgent: MultiOutSimpleAgent = MultiOutSimpleAgent(MultiOutSimpleAgentConfig())
-    bufferAgent_1 = IdentityAgent(config=IdentityAgentConfig(), uuid='multi_1')
-    bufferAgent_2 = IdentityAgent(config=IdentityAgentConfig(), uuid='multi_2')
+    bufferAgent_1 = IdentityAgent(uuid='multi_1')
+    bufferAgent_2 = IdentityAgent(uuid='multi_2')
 
-    multiAgent.connectTo(bufferAgent_1, source_output_schema=MultiOutSimpleAgentSchema1)
-    multiAgent.connectTo(bufferAgent_2, source_output_schema=MultiOutSimpleAgentSchema2)
+    multiAgent.connectTo(bufferAgent_1, from_output=MultiOutSimpleAgentSchema1)
+    multiAgent.connectTo(bufferAgent_2, from_output=MultiOutSimpleAgentSchema2)
 
 
 

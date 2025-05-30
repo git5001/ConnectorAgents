@@ -1,42 +1,15 @@
-import json
 import logging
 import os
 import time
-from pathlib import Path
-from typing import List, Dict
 
 from atomic_agents.lib.base.base_tool import BaseToolConfig
-from dotenv import load_dotenv
-from openai import NOT_GIVEN
-from pydantic import HttpUrl, TypeAdapter, BaseModel
 
 from AgentBookmarks.CountNumbersAgent import CountNumbersAgent, CountNumbersAgentConfig, CountNumbersAgentSchema
-from AgentBookmarks.WebpageToCategoryAgent import WebpageToCategoryAgent, WebpageToCategoryInput, BookmarkOutput
-from AgentBookmarks.BookmarkMultiPortAggregatorAgent import BookmarkMultiPortAggregatorAgent, \
-    BookmarkMultiPortAggregatorAgentConfig
-from AgentBookmarks.CategoryGeneralizationLLMAgent import CategoryGeneralizationLLMAgent
-from AgentBookmarks.CategoryMultiPortAggregatorAgent import CategoryMultiPortAggregatorAgentConfig, \
-    CategoryMultiPortAggregatorAgent
-from AgentBookmarks.DummyWebScraperAgent import DummyWebScraperAgent
-from AgentBookmarks.FinalCollectPortAggregatorAgent import FinalCollectPortAggregatorAgent
-from AgentBookmarks.FirefoxBookmarkAgent import FirefoxBookmarkAgentConfig, FirefoxBookmarkAgent, \
-    FirefoxBookmarksOutput, Bookmark
-from AgentBookmarks.FirefoxBookmarkStorageAgent import FirefoxBookmarkStorageAgent, FirefoxBookmarkStorageAgentConfig
-from AgentBookmarks.GenerateCategoryForBookmarkAgent import GenerateCategoryForBookmarkAgent
-from AgentBookmarks.WebScraperAgent import WebScraperAgent
-from AgentFramework.AgentScheduler import AgentScheduler
-from AgentFramework.CounterAgent import CounterAgent, CounterSchema, CounterAgentConfig
-from AgentFramework.IdentityAgent import IdentityAgent, IdentityAgentConfig
-from AgentFramework.ListCollectionAgent import ListCollectionAgent
-from AgentFramework.LoadJsonAgent import LoadJsonAgentConfig, LoadJsonAgent
-from AgentFramework.PiplinePrinter import PipelinePrinter
-from AgentFramework.SaveJsonAgent import SaveJsonAgentConfig, SaveJsonAgent
-from AtomicTools.browser_handling.BrowserManager import get_browser_manager
-from AtomicTools.webpage_scraper.tool.webpage_scraper import WebpageScraperToolConfig, WebpageScraperToolInputSchema, \
-    WebpageScraperToolOutputSchema
-from agent_config import DUMMY_WEB
+from AgentFramework.core.AgentScheduler import AgentScheduler
+from AgentFramework.support.CounterAgent import CounterAgent, CounterSchema, CounterAgentConfig
+from AgentFramework.core.IdentityAgent import IdentityAgent, IdentityAgentConfig
+from AgentFramework.core.PiplinePrinter import PipelinePrinter
 from agent_logging import rich_console
-from util.LLMSupport import LLMAgentConfig, Provider
 
 # Set up root logger once
 logging.basicConfig(level=logging.INFO)
@@ -56,9 +29,8 @@ def main():
     os.makedirs(LLM_LOG_DIR, exist_ok=True)
 
     numbersAgent: CountNumbersAgent = CountNumbersAgent(CountNumbersAgentConfig(from_number=2, to_number=8))
-    sinkAgent: ListCollectionAgent = ListCollectionAgent(BaseToolConfig(), uuid='collect_numbers')
-    sinkCntAgent: ListCollectionAgent = ListCollectionAgent(BaseToolConfig(), uuid='collect_counter')
-    counter1: CounterAgent = CounterAgent(CounterAgentConfig(counter_fields=['count']))
+    sinkAgent: IdentityAgent = IdentityAgent(uuid='sink_1', collect_input=True)
+    counter1: CounterAgent = CounterAgent(CounterAgentConfig(counter_fields=['count']), collect_input=True)
     identityAgent1 = IdentityAgent(config=IdentityAgentConfig(), uuid='id_1')
 
 
@@ -80,8 +52,7 @@ def main():
 
     numbersAgent.connectTo(identityAgent1, condition=numbers_condition)
     identityAgent1.connectTo(sinkAgent)
-    identityAgent1.connectTo(sinkCntAgent, transformer=transform_numbers_to_counter)
-    sinkCntAgent.connectTo(counter1)
+    identityAgent1.connectTo(counter1, pre_transformer=transform_numbers_to_counter)
 
 
 
@@ -93,7 +64,6 @@ def main():
     scheduler.add_agent(identityAgent1)
     scheduler.add_agent(counter1)
     scheduler.add_agent(sinkAgent)
-    scheduler.add_agent(sinkCntAgent)
 
     printer = PipelinePrinter(is_ortho=False,
                               direction='LR',

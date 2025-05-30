@@ -5,8 +5,7 @@ from openai import BaseModel
 from pydantic import Field
 
 from AgentBookmarks.BookmarkMultiPortAggregatorAgent import BookmarkMultiPortAggregatorOutput
-from AgentBookmarks.config import OFFLINE_BOOKMARK
-from AgentFramework.ConnectedAgent import ConnectedAgent
+from AgentFramework.core.ConnectedAgent import ConnectedAgent
 from agent_config import DUMMY_LLM
 from agent_logging import logger
 from util.LLMSupport import LLMModel, LLMAgentConfig
@@ -108,7 +107,7 @@ class GenerateCategoryForBookmarkAgent(ConnectedAgent):
             sysprompt = None
             userprompt = self._prompt(params)
             try:
-                result_object, usage = self.model.execute_llm_schema(sysprompt, userprompt, targetType=self.output_schema, title='Step 1')
+                result_object, usage = self.model.hl_pydantic_completions(sysprompt, userprompt, targetType=self.output_schema, title='Step 1')
                 logger.info(f"LLM boomark result folder={params.bookmark.folder} --> '{result_object.hauptkategorie}/{result_object.unterkategorie}'")
             except Exception as e:
                 logger.error(f"{self.__class__.__name__} failed for {params.bookmark.folder} with {e}")

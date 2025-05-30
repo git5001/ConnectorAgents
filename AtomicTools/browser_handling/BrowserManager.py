@@ -1,5 +1,7 @@
 
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
+from playwright_stealth import stealth_sync
+
 class BrowserManager:
     def __init__(self, user_agent: str = None, headless: bool = True, viewport: dict = None):
         self._playwright = sync_playwright().start()
@@ -16,11 +18,23 @@ class BrowserManager:
 
     def get_page(self) -> Page:
         try:
-            return self.context.new_page()
+            page = self.context.new_page()
+            stealth_sync(page)
+            return page
         except Exception as e:
             print(f"[BrowserManager] Failed to get new page: {e}. Resetting context.")
             self.reset_context()
-            return self.context.new_page()
+            page = self.context.new_page()
+            stealth_sync(page)
+            return page
+
+    # def get_page(self) -> Page:
+    #     try:
+    #         return self.context.new_page()
+    #     except Exception as e:
+    #         print(f"[BrowserManager] Failed to get new page: {e}. Resetting context.")
+    #         self.reset_context()
+    #         return self.context.new_page()
 
     def reset_context(self):
         if self.context:

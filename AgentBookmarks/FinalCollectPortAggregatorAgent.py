@@ -9,8 +9,8 @@ from AgentBookmarks.CategoryGeneralizationLLMAgent import KategorieGeneralisieru
 from AgentBookmarks.FirefoxBookmarkAgent import FirefoxBookmarksOutput, Bookmark
 from AgentBookmarks.GenerateCategoryForBookmarkAgent import GenerateCategoryForBookmarkOutput
 from AgentBookmarks.config import OFFLINE_BOOKMARK
-from AgentFramework.ListCollectionAgent import ListModel
-from AgentFramework.MultiPortAggregatorAgent import MultiPortAggregatorAgent
+from AgentFramework.core.ListCollectionAgent import ListModel
+from AgentFramework.core.MultiPortAgent import MultiPortAggregatorAgent
 from AgentNews.NewsSchema import MergedOutput
 from agent_config import DUMMY_LLM
 from agent_logging import logger, rich_console

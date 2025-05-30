@@ -1,6 +1,6 @@
 import random
 
-from AgentFramework.ConnectedAgent import ConnectedAgent
+from AgentFramework.core.ConnectedAgent import ConnectedAgent
 
 from AtomicTools.webpage_scraper.tool.webpage_scraper import WebpageScraperToolInputSchema, \
     WebpageScraperToolOutputSchema, WebpageScraperToolConfig, WebpageMetadata

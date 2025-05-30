@@ -1,12 +1,11 @@
 import logging
-import logging
 import os
 import time
 
-from AgentFramework.AgentScheduler import AgentScheduler
-from AgentFramework.IdentityAgent import IdentityAgent, IdentityAgentConfig
-from AgentFramework.PiplinePrinter import PipelinePrinter
-from AgentFramework.TCPDebugger import TCPDebugger
+from AgentFramework.core.AgentScheduler import AgentScheduler
+from AgentFramework.core.IdentityAgent import IdentityAgent
+from AgentFramework.core.PiplinePrinter import PipelinePrinter
+from AgentFramework.debugger.TCPDebugger import TCPDebugger
 from AgentMultiPort.MultiOutSimpleAgent2 import MultiOutSimpleAgent2, MultiOutSimpleAgentConfig, \
     MultiOutSimpleAgentSchema1, MultiOutSimpleAgentSchema2
 from agent_logging import rich_console
@@ -29,12 +28,12 @@ def main():
     os.makedirs(LLM_LOG_DIR, exist_ok=True)
 
     multiAgent: MultiOutSimpleAgent2 = MultiOutSimpleAgent2(MultiOutSimpleAgentConfig())
-    bufferAgent_1 = IdentityAgent(config=IdentityAgentConfig(), uuid='multi_1')
-    bufferAgent_2 = IdentityAgent(config=IdentityAgentConfig(), uuid='multi_2')
+    bufferAgent_1 = IdentityAgent(uuid='multi_1')
+    bufferAgent_2 = IdentityAgent(uuid='multi_2')
 
-    multiAgent.connectTo(bufferAgent_1, source_output_schema=MultiOutSimpleAgentSchema1)
-    multiAgent.connectTo(bufferAgent_2, source_output_schema=MultiOutSimpleAgentSchema2)
-    multiAgent.connectTo(multiAgent, source_output_schema=MultiOutSimpleAgentSchema1)
+    multiAgent.connectTo(bufferAgent_1, from_output=MultiOutSimpleAgentSchema1)
+    multiAgent.connectTo(bufferAgent_2, from_output=MultiOutSimpleAgentSchema2)
+    multiAgent.connectTo(multiAgent, from_output=MultiOutSimpleAgentSchema1)
 
 
 
