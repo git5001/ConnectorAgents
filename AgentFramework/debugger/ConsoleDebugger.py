@@ -11,13 +11,14 @@ class ConsoleDebugger(DebugInterface):
     """
     A console-based debugger that prints and optionally logs agent events and messages.
     """
-    def __init__(self, show_parents: bool = False, log_dir: Optional[Union[str, Path]] = None):
+    def __init__(self, print_console: bool = False, show_parents: bool = False, log_dir: Optional[Union[str, Path]] = None):
         """
         :param show_parents: If True, prints parent UUIDs for messages.
         :param log_dir: Optional directory to save a 'debug.log' file. If provided,
                         the log file is reset on init_debugger and appended thereafter.
         """
         self.show_parents = show_parents
+        self.print_console = print_console
         if log_dir:
             self.log_dir = Path(log_dir)
             self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -30,7 +31,8 @@ class ConsoleDebugger(DebugInterface):
 
     def _log(self, message: str) -> None:
         """Prints to console and appends to log file if configured."""
-        print(message)
+        if self.print_console:
+            print(message)
         if self.log_file:
             try:
                 with open(self.log_file, 'a', encoding='utf-8') as f:

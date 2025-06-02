@@ -75,6 +75,9 @@ class AgentScheduler(Schedulable):
         if self.error_dir is not None:
             os.makedirs(self.error_dir, exist_ok=True)
 
+    @property
+    def global_state(self) -> BaseModel:
+        return self._global_state
 
     def close(self):
         """

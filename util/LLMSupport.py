@@ -9,6 +9,11 @@ from enum import Enum
 from typing import Optional, List, Dict, Any, Type, Union, Callable, Tuple
 
 import json5
+import tiktoken
+import nltk
+nltk.download("punkt")
+nltk.download('punkt_tab')
+
 from atomic_agents.lib.base.base_tool import BaseToolConfig
 from openai import OpenAI, NOT_GIVEN
 from openai.types import CompletionUsage
@@ -459,8 +464,10 @@ class LLMModel:
             messages = [{"role": "user", "content": f"{sysprompt}\n{user_prompt}"}]
             # logger.debug(f"Prompt is: {sysprompt}\n{user_prompt}")
         if attempt > 2:
-            messages.append(
-                "Your output must be a completely valid JSON, no additional text before or after the JSON output. All fields of the templte must be filled.")
+            messages.append({
+                "role": "user",
+                "content": "Your output must be a completely valid JSON, no additional text before or after the JSON output. All fields of the template must be filled."
+            })
         try:
             logger.info(f"### Attempt #{attempt}: Calling external LLM {self.name()} for {title}")
             response = self.create_json_completions(messages, targetType.__name__, schema_dict, temperature)
@@ -519,3 +526,28 @@ class LLMModel:
 
         return result_object, usage
 
+    @staticmethod
+    def truncate_content(content, max_tokens, tokenizer_name="gpt-4", level="sentence"):
+        tokenizer = tiktoken.encoding_for_model(tokenizer_name)
+
+        # Determine the splitting strategy
+        if level == "sentence":
+            units = nltk.sent_tokenize(content)
+        elif level == "word":
+            units = content.split()
+        else:
+            raise ValueError("Level must be 'sentence' or 'word'")
+
+        truncated_units = []
+        total_tokens = 0
+
+        for unit in units:
+            unit_tokens = tokenizer.encode(unit)
+            if total_tokens + len(unit_tokens) > max_tokens:
+                break
+            truncated_units.append(unit)
+            total_tokens += len(unit_tokens)
+
+        truncated_content = " ".join(truncated_units)
+        print(f"[Tokenizer] Final truncated token count: {total_tokens}")
+        return truncated_content

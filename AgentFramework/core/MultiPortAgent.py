@@ -156,7 +156,9 @@ class MultiPortAgent(ConnectedAgent):
         first_port_schema = self.input_schemas[0]
         first_port = self._input_ports[first_port_schema]
 
-        for anchor_idx, (anchor_parents, _) in enumerate(first_port.queue):
+
+
+        for anchor_idx, (anchor_parents, timestamp, unique_id, message) in enumerate(first_port.queue):
             chain_parents = self.extract_parents_with_suffix(anchor_parents)
             search_keys = {f":{idx1}:{idx2}" for _, (_, idx1, idx2) in chain_parents.items()}
 
@@ -168,7 +170,7 @@ class MultiPortAgent(ConnectedAgent):
                     continue
 
                 found = None
-                for idx, (parents, _) in enumerate(port.queue):
+                for idx, (parents, timestamp, unique_id, message) in enumerate(port.queue):
                     candidate_suffixes = {":" + ":".join(p.split(":")[1:]) for p in parents if p.count(":") >= 2}
                     if search_keys.issubset(candidate_suffixes):
                         found = idx
